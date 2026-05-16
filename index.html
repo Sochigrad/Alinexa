@@ -1,0 +1,2464 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Alinexa</title>
+    <style>
+:root {
+  --bg: #eef2f7;
+  --ink: #111827;
+  --muted: #667085;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --line: #d7dde8;
+  --accent: #0f766e;
+  --accent-strong: #115e59;
+  --accent-soft: rgba(15, 118, 110, 0.16);
+  --app-background:
+    radial-gradient(circle at top left, var(--accent-soft), transparent 32rem),
+    linear-gradient(145deg, var(--panel-2), var(--bg));
+  --danger: #c2410c;
+  --shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--app-background);
+  background-attachment: fixed;
+  background-position: center;
+  background-size: cover;
+  color: var(--ink);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow: hidden;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 18px 10px;
+}
+
+.brand p,
+.brand h1 {
+  margin: 0;
+}
+
+.brand p {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.brand h1 {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.icon-button,
+.avatar-button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.icon-button span {
+  width: 18px;
+  height: 2px;
+  border-radius: 99px;
+  background: currentColor;
+}
+
+.avatar-button {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.board-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 4px 18px 14px;
+}
+
+.board-meta div {
+  min-width: 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  padding: 10px 12px;
+}
+
+.board-meta strong,
+.board-meta span {
+  display: block;
+}
+
+.board-meta strong {
+  font-size: 20px;
+}
+
+.board-meta span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board {
+  display: grid;
+  grid-auto-columns: minmax(0, calc(100vw - 36px));
+  grid-auto-flow: column;
+  gap: 14px;
+  align-items: start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 18px 98px;
+  scroll-padding-inline: 18px;
+  scroll-snap-type: x proximity;
+}
+
+.column {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  max-height: calc(100vh - 230px);
+  max-height: calc(100svh - 230px);
+  min-height: 310px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.1);
+  scroll-snap-align: start;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.column-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  font-weight: 850;
+}
+
+.column-name-button {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  font-weight: inherit;
+}
+
+.column-name-button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-name-button:focus-visible,
+.column-edit:focus-visible,
+.column-add:focus-visible {
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+.counter {
+  min-width: 26px;
+  border-radius: 99px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 22px;
+  text-align: center;
+}
+
+.column-add {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #ccfbf1;
+  color: var(--accent-strong);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.column-tools {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.column-edit {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.card-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 220px;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.card-list.is-over {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.task-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-left: 5px solid var(--card-status-color, var(--accent));
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, var(--card-status-soft, transparent), transparent 46%),
+    var(--panel);
+  padding: 12px;
+  text-align: left;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.task-card:active {
+  cursor: grabbing;
+  transform: scale(0.99);
+}
+
+.task-card.is-dragging {
+  opacity: 0.48;
+}
+
+.task-card.is-lifted {
+  position: fixed;
+  z-index: 40;
+  width: min(276px, calc(100vw - 36px));
+  pointer-events: none;
+  transform: rotate(1.5deg) scale(1.03);
+  box-shadow: 0 22px 52px rgba(15, 23, 42, 0.24);
+}
+
+.task-card h3,
+.task-card p {
+  margin: 0;
+}
+
+.task-card.status-today {
+  --card-status-color: #f97316;
+  --card-status-soft: rgba(249, 115, 22, 0.16);
+}
+
+.task-card.status-urgent {
+  --card-status-color: #dc2626;
+  --card-status-soft: rgba(220, 38, 38, 0.16);
+}
+
+.task-card.status-planned {
+  --card-status-color: #2563eb;
+  --card-status-soft: rgba(37, 99, 235, 0.13);
+}
+
+.task-card.status-waiting {
+  --card-status-color: #7c3aed;
+  --card-status-soft: rgba(124, 58, 237, 0.13);
+}
+
+.task-card.status-done {
+  --card-status-color: #16a34a;
+  --card-status-soft: rgba(22, 163, 74, 0.14);
+}
+
+.status-chip {
+  border-radius: 99px;
+  background: var(--card-status-soft, #e2e8f0);
+  color: #0f172a;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.task-card h3 {
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.task-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card-badges {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.label {
+  border-radius: 99px;
+  background: var(--label-color, #bae6fd);
+  padding: 5px 8px;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.focus-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f97316;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.13);
+}
+
+.empty-state {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.bottom-bar {
+  position: fixed;
+  right: 12px;
+  bottom: calc(10px + var(--safe-bottom));
+  left: 12px;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.94);
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+
+.bottom-action {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-width: 0;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: #cbd5e1;
+  padding: 8px 4px;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.bottom-action.is-active {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.action-icon {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.bottom-action.is-active .action-icon {
+  background: color-mix(in srgb, var(--accent) 20%, white);
+  color: var(--accent-strong);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: rgba(15, 23, 42, 0.44);
+}
+
+.sheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  max-height: 88vh;
+  max-height: 88svh;
+  overflow-y: auto;
+  border-radius: 24px 24px 0 0;
+  background: var(--panel);
+  padding: 10px 18px calc(18px + var(--safe-bottom));
+  box-shadow: var(--shadow);
+  transform: translateY(106%);
+  transition: transform 180ms ease;
+}
+
+.sheet .sheet-actions {
+  position: sticky;
+  bottom: calc(-18px - var(--safe-bottom));
+  z-index: 2;
+  background: var(--panel);
+  padding: 8px 0 calc(18px + var(--safe-bottom));
+}
+
+.sheet.is-open {
+  transform: translateY(0);
+}
+
+.sheet.compact {
+  max-height: 62vh;
+  max-height: 62svh;
+}
+
+.sheet-handle {
+  width: 48px;
+  height: 5px;
+  margin: 0 auto 16px;
+  border-radius: 99px;
+  background: #cbd5e1;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.sheet-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+form,
+.search-results {
+  display: grid;
+  gap: 14px;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--ink);
+  padding: 12px;
+  outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+textarea {
+  resize: vertical;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: 20px;
+  height: 20px;
+}
+
+.sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 10px;
+}
+
+.primary-button,
+.danger-button,
+.ghost-button {
+  min-height: 44px;
+  border-radius: 8px;
+  font-weight: 850;
+}
+
+.primary-button {
+  border: 0;
+  background: var(--accent);
+  color: white;
+}
+
+.primary-button.wide {
+  width: 100%;
+}
+
+.danger-button {
+  border: 1px solid rgba(194, 65, 12, 0.2);
+  background: #fff7ed;
+  color: var(--danger);
+}
+
+.ghost-button {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #334155;
+  padding: 0 14px;
+}
+
+.mini-link-button {
+  justify-self: start;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  padding: 0;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.search-result {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 12px;
+}
+
+.search-result strong,
+.search-result span {
+  display: block;
+}
+
+.search-result span {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.voice-inline-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  color: var(--accent-strong);
+}
+
+.voice-inline-button span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 11px;
+}
+
+.voice-inline-button.is-recording {
+  border-color: rgba(220, 38, 38, 0.34);
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.voice-inline-button.is-recording span {
+  background: #dc2626;
+  animation: pulse-record 1.2s infinite;
+}
+
+.voice-panel {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 14px;
+  text-align: center;
+}
+
+.voice-record-button {
+  display: grid;
+  width: 74px;
+  height: 74px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 16px 34px var(--accent-soft);
+}
+
+.voice-record-button span {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: white;
+}
+
+.voice-record-button.is-recording {
+  background: #dc2626;
+  animation: pulse-record 1.2s infinite;
+}
+
+.voice-record-button.is-recording span {
+  border-radius: 8px;
+}
+
+.voice-panel strong {
+  font-size: 17px;
+}
+
+.voice-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@keyframes pulse-record {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.26);
+  }
+
+  70% {
+    box-shadow: 0 0 0 18px rgba(220, 38, 38, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.background-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.background-choice {
+  min-height: 48px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--choice-bg);
+  background-position: center;
+  background-size: cover;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.14);
+}
+
+.background-choice.is-selected {
+  border-color: var(--ink);
+}
+
+.file-field input {
+  padding: 10px;
+}
+
+.labels-list {
+  display: grid;
+  gap: 10px;
+}
+
+.label-editor-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 38px;
+  gap: 10px;
+  align-items: center;
+}
+
+.label-editor-row input[type="color"] {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+
+.label-delete-button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--danger);
+  font-weight: 900;
+}
+
+.labels-add-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.color-field {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 10px 12px;
+}
+
+.color-field input {
+  width: 46px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0;
+}
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.swatch {
+  min-height: 48px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
+}
+
+.swatch.is-selected {
+  border-color: var(--ink);
+}
+
+.swatch.ocean {
+  background: linear-gradient(135deg, #0f766e 0 34%, #eef2f7 34% 68%, #ffffff 68%);
+}
+
+.swatch.berry {
+  background: linear-gradient(135deg, #be185d 0 34%, #fff1f2 34% 68%, #ffffff 68%);
+}
+
+.swatch.graphite {
+  background: linear-gradient(135deg, #334155 0 34%, #e5e7eb 34% 68%, #f8fafc 68%);
+}
+
+.swatch.sun {
+  background: linear-gradient(135deg, #d97706 0 34%, #fff7ed 34% 68%, #ffffff 68%);
+}
+
+@media (min-width: 760px) {
+  .app-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  .topbar {
+    padding-top: 24px;
+  }
+
+  .board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-columns: initial;
+    grid-auto-flow: row;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-bottom: 112px;
+    scroll-snap-type: none;
+  }
+
+  .column {
+    max-height: calc(100vh - 246px);
+    scroll-snap-align: none;
+  }
+
+  .bottom-bar {
+    right: 50%;
+    left: auto;
+    width: 620px;
+    transform: translateX(50%);
+  }
+
+  .sheet {
+    right: 50%;
+    left: auto;
+    width: 520px;
+    border-radius: 24px 24px 0 0;
+    transform: translate(50%, 106%);
+  }
+
+  .sheet.is-open {
+    transform: translate(50%, 0);
+  }
+}
+
+@media (min-width: 1040px) {
+  .app-shell {
+    max-width: 1440px;
+  }
+
+  .board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-right: 18px;
+  }
+
+  .column {
+    max-height: calc(100vh - 246px);
+  }
+}
+
+@media (min-width: 1320px) {
+  .board {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+
+</style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <button class="icon-button" id="menuButton" type="button" aria-label="Открыть поиск">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <div class="brand">
+          <p>Мобильная доска</p>
+          <h1 id="boardTitle">Alinexa</h1>
+        </div>
+        <button class="avatar-button" id="clearButton" type="button" aria-label="Сбросить доску">AX</button>
+      </header>
+
+      <section class="board-meta" aria-label="Статистика доски">
+        <div>
+          <strong id="totalCards">0</strong>
+          <span>карточек</span>
+        </div>
+        <div>
+          <strong id="doneCards">0</strong>
+          <span>готово</span>
+        </div>
+        <div>
+          <strong id="focusCards">0</strong>
+          <span>с фокусом</span>
+        </div>
+      </section>
+
+      <main class="board" id="board" aria-label="Колонки задач"></main>
+
+      <nav class="bottom-bar" aria-label="Быстрые действия">
+        <button class="bottom-action is-active" id="addCardButton" type="button">
+          <span class="action-icon">+</span>
+          <span>Карточка</span>
+        </button>
+        <button class="bottom-action" id="addColumnButton" type="button">
+          <span class="action-icon">#</span>
+          <span>Колонка</span>
+        </button>
+        <button class="bottom-action" id="searchButton" type="button">
+          <span class="action-icon">⌕</span>
+          <span>Поиск</span>
+        </button>
+        <button class="bottom-action" id="themeButton" type="button">
+          <span class="action-icon">◐</span>
+          <span>Тема</span>
+        </button>
+        <button class="bottom-action" id="voiceButton" type="button">
+          <span class="action-icon">●</span>
+          <span>Голос</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="scrim" id="scrim" hidden></div>
+
+    <aside class="sheet" id="cardSheet" aria-hidden="true" aria-label="Редактор карточки">
+      <form id="cardForm">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2 id="sheetTitle">Новая карточка</h2>
+          <button class="ghost-button" id="closeSheetButton" type="button">Закрыть</button>
+        </div>
+        <label>
+          Название
+          <input id="cardTitleInput" name="title" type="text" maxlength="80" required />
+        </label>
+        <label>
+          Описание
+          <textarea id="cardDescriptionInput" name="description" rows="4" maxlength="260"></textarea>
+        </label>
+        <button class="voice-inline-button" id="dictateDescriptionButton" type="button">
+          <span>●</span>
+          <strong>Надиктовать описание</strong>
+        </button>
+        <div class="field-grid">
+          <label>
+            Колонка
+            <select id="cardColumnInput" name="column"></select>
+          </label>
+          <label>
+            Метка
+            <select id="cardLabelInput" name="label">
+              <option value="product">Продукт</option>
+              <option value="design">Дизайн</option>
+              <option value="dev">Разработка</option>
+              <option value="ops">Операции</option>
+            </select>
+            <button class="mini-link-button" id="editLabelsButton" type="button">Настроить метки</button>
+          </label>
+        </div>
+        <label class="checkbox-row">
+          <input id="cardFocusInput" name="focus" type="checkbox" />
+          <span>В фокусе на сегодня</span>
+        </label>
+        <label>
+          Визуальный статус
+          <select id="cardStatusInput" name="status">
+            <option value="planned">Запланировано</option>
+            <option value="today">Сделать сегодня</option>
+            <option value="urgent">Срочно</option>
+            <option value="waiting">Ожидает</option>
+            <option value="done">Завершено</option>
+          </select>
+        </label>
+        <div class="sheet-actions">
+          <button class="danger-button" id="deleteCardButton" type="button">Удалить</button>
+          <button class="primary-button" type="submit">Сохранить</button>
+        </div>
+      </form>
+    </aside>
+
+    <aside class="sheet compact" id="columnSheet" aria-hidden="true" aria-label="Новая колонка">
+      <form id="columnForm">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2 id="columnSheetTitle">Новая колонка</h2>
+          <button class="ghost-button" id="closeColumnButton" type="button">Закрыть</button>
+        </div>
+        <label>
+          Название
+          <input id="columnTitleInput" name="title" type="text" maxlength="34" required />
+        </label>
+        <div class="sheet-actions">
+          <button class="danger-button" id="deleteColumnButton" type="button">Удалить</button>
+          <button class="primary-button" id="saveColumnButton" type="submit">Добавить колонку</button>
+        </div>
+      </form>
+    </aside>
+
+    <aside class="sheet compact" id="searchSheet" aria-hidden="true" aria-label="Поиск по карточкам">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2>Поиск</h2>
+        <button class="ghost-button" id="closeSearchButton" type="button">Закрыть</button>
+      </div>
+      <label>
+        Текст
+        <input id="searchInput" type="search" placeholder="Название, описание или метка" />
+      </label>
+      <div class="search-results" id="searchResults"></div>
+    </aside>
+
+    <aside class="sheet compact" id="themeSheet" aria-hidden="true" aria-label="Настройка цветов">
+      <form id="themeForm">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Цвета</h2>
+          <button class="ghost-button" id="closeThemeButton" type="button">Закрыть</button>
+        </div>
+        <div class="swatch-grid" aria-label="Готовые темы">
+          <button class="swatch ocean" type="button" data-preset="ocean" aria-label="Бирюзовая тема"></button>
+          <button class="swatch berry" type="button" data-preset="berry" aria-label="Ягодная тема"></button>
+          <button class="swatch graphite" type="button" data-preset="graphite" aria-label="Графитовая тема"></button>
+          <button class="swatch sun" type="button" data-preset="sun" aria-label="Солнечная тема"></button>
+        </div>
+        <h3 class="sheet-subtitle">Фоны</h3>
+        <div class="background-grid" id="backgroundGrid" aria-label="Готовые фоны"></div>
+        <label class="file-field">
+          Свой фон
+          <input id="backgroundFileInput" type="file" accept="image/*" />
+        </label>
+        <div class="theme-grid">
+          <label class="color-field">
+            Акцент
+            <input id="accentColorInput" name="accent" type="color" />
+          </label>
+          <label class="color-field">
+            Фон
+            <input id="bgColorInput" name="bg" type="color" />
+          </label>
+          <label class="color-field">
+            Карточки
+            <input id="panelColorInput" name="panel" type="color" />
+          </label>
+          <label class="color-field">
+            Текст
+            <input id="inkColorInput" name="ink" type="color" />
+          </label>
+        </div>
+        <div class="sheet-actions">
+          <button class="ghost-button" id="resetThemeButton" type="button">Сбросить</button>
+          <button class="primary-button" type="submit">Сохранить</button>
+        </div>
+      </form>
+    </aside>
+
+    <aside class="sheet" id="voiceSheet" aria-hidden="true" aria-label="Голосовая карточка">
+      <form id="voiceForm">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Голосовая карточка</h2>
+          <button class="ghost-button" id="closeVoiceButton" type="button">Закрыть</button>
+        </div>
+        <div class="voice-panel">
+          <button class="voice-record-button" id="recordVoiceButton" type="button" aria-pressed="false">
+            <span></span>
+          </button>
+          <strong id="voiceStatus">Готов к диктовке</strong>
+          <p id="voiceHint">Нажмите кнопку и говорите. Текст попадет в карточку.</p>
+        </div>
+        <label>
+          Текст карточки
+          <textarea id="voiceTextInput" rows="6" maxlength="900" placeholder="Здесь появится распознанный текст"></textarea>
+        </label>
+        <div class="field-grid">
+          <label>
+            Колонка
+            <select id="voiceColumnInput"></select>
+          </label>
+          <label>
+            Метка
+            <select id="voiceLabelInput">
+              <option value="product">Продукт</option>
+              <option value="design">Дизайн</option>
+              <option value="dev">Разработка</option>
+              <option value="ops">Операции</option>
+            </select>
+            <button class="mini-link-button" id="editVoiceLabelsButton" type="button">Настроить метки</button>
+          </label>
+        </div>
+        <label class="checkbox-row">
+          <input id="voiceFocusInput" type="checkbox" checked />
+          <span>В фокусе на сегодня</span>
+        </label>
+        <label>
+          Визуальный статус
+          <select id="voiceStatusInput">
+            <option value="today">Сделать сегодня</option>
+            <option value="planned">Запланировано</option>
+            <option value="urgent">Срочно</option>
+            <option value="waiting">Ожидает</option>
+            <option value="done">Завершено</option>
+          </select>
+        </label>
+        <div class="sheet-actions">
+          <button class="ghost-button" id="clearVoiceTextButton" type="button">Очистить</button>
+          <button class="primary-button" type="submit">Создать карточку</button>
+        </div>
+      </form>
+    </aside>
+
+    <aside class="sheet compact" id="labelsSheet" aria-hidden="true" aria-label="Редактирование меток">
+      <form id="labelsForm">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Метки</h2>
+          <button class="ghost-button" id="closeLabelsButton" type="button">Закрыть</button>
+        </div>
+        <div class="labels-list" id="labelsList"></div>
+        <div class="labels-add-row">
+          <input id="newLabelInput" type="text" maxlength="22" placeholder="Новая метка" />
+          <button class="ghost-button" id="addLabelButton" type="button">Добавить</button>
+        </div>
+        <div class="sheet-actions">
+          <button class="ghost-button" id="resetLabelsButton" type="button">Сбросить</button>
+          <button class="primary-button" type="submit">Сохранить</button>
+        </div>
+      </form>
+    </aside>
+
+    <script>
+const STORAGE_KEY = "taskflow-board-v1";
+const THEME_KEY = "taskflow-theme-v1";
+const LABELS_KEY = "taskflow-labels-v1";
+
+const defaultTheme = {
+  accent: "#0f766e",
+  bg: "#eef2f7",
+  panel: "#ffffff",
+  ink: "#111827",
+  background: "mist",
+  customBackground: "",
+};
+
+const themePresets = {
+  ocean: { ...defaultTheme },
+  berry: {
+    accent: "#be185d",
+    bg: "#fff1f2",
+    panel: "#ffffff",
+    ink: "#171018",
+    background: "rose",
+    customBackground: "",
+  },
+  graphite: {
+    accent: "#334155",
+    bg: "#e5e7eb",
+    panel: "#f8fafc",
+    ink: "#111827",
+    background: "graphite",
+    customBackground: "",
+  },
+  sun: {
+    accent: "#d97706",
+    bg: "#fff7ed",
+    panel: "#ffffff",
+    ink: "#1f1300",
+    background: "sunrise",
+    customBackground: "",
+  },
+};
+
+const backgroundPresets = [
+  { id: "mist", css: "radial-gradient(circle at 18% 12%, rgba(20,184,166,.24), transparent 28rem), linear-gradient(145deg, #f8fafc, #eef2f7)" },
+  { id: "ocean", css: "linear-gradient(135deg, rgba(8,47,73,.88), rgba(14,116,144,.66)), radial-gradient(circle at 80% 12%, #67e8f9, transparent 22rem)" },
+  { id: "rose", css: "radial-gradient(circle at 20% 20%, rgba(244,114,182,.36), transparent 22rem), linear-gradient(135deg, #fff1f2, #fdf2f8)" },
+  { id: "forest", css: "linear-gradient(135deg, rgba(20,83,45,.88), rgba(21,128,61,.5)), radial-gradient(circle at 70% 20%, #bbf7d0, transparent 20rem)" },
+  { id: "sunrise", css: "radial-gradient(circle at 18% 18%, rgba(251,146,60,.42), transparent 20rem), linear-gradient(135deg, #fff7ed, #fef3c7)" },
+  { id: "violet", css: "radial-gradient(circle at 80% 10%, rgba(167,139,250,.4), transparent 24rem), linear-gradient(135deg, #f5f3ff, #eef2ff)" },
+  { id: "graphite", css: "linear-gradient(135deg, #e5e7eb, #f8fafc), radial-gradient(circle at 15% 10%, rgba(51,65,85,.18), transparent 18rem)" },
+  { id: "skyline", css: "linear-gradient(160deg, rgba(37,99,235,.2), transparent 36%), repeating-linear-gradient(90deg, rgba(15,23,42,.08) 0 1px, transparent 1px 42px), linear-gradient(135deg, #eff6ff, #f8fafc)" },
+  { id: "paper", css: "repeating-linear-gradient(0deg, rgba(15,23,42,.045) 0 1px, transparent 1px 28px), linear-gradient(135deg, #fffef7, #f8fafc)" },
+  { id: "aurora", css: "radial-gradient(circle at 12% 20%, rgba(45,212,191,.38), transparent 18rem), radial-gradient(circle at 78% 18%, rgba(129,140,248,.34), transparent 22rem), linear-gradient(135deg, #f8fafc, #ecfeff)" },
+];
+
+const statusNames = {
+  planned: "План",
+  today: "Сегодня",
+  urgent: "Срочно",
+  waiting: "Ожидает",
+  done: "Готово",
+};
+
+const defaultLabels = [
+  { id: "product", name: "Продукт", color: "#bae6fd" },
+  { id: "design", name: "Дизайн", color: "#ddd6fe" },
+  { id: "dev", name: "Разработка", color: "#bbf7d0" },
+  { id: "ops", name: "Операции", color: "#fed7aa" },
+];
+
+const defaultBoard = {
+  columns: [
+    { id: "backlog", title: "Бэклог" },
+    { id: "doing", title: "В работе" },
+    { id: "review", title: "Проверка" },
+    { id: "done", title: "Готово" },
+  ],
+  cards: [
+    {
+      id: "card-1",
+      columnId: "backlog",
+      title: "Собрать идеи для релиза",
+      description: "Коротко описать самые ценные фичи и убрать лишнее.",
+      label: "product",
+      focus: true,
+      order: 0,
+      createdAt: Date.now() - 4000,
+    },
+    {
+      id: "card-2",
+      columnId: "doing",
+      title: "Прототип мобильного экрана",
+      description: "Проверить навигацию, нижнюю панель и лист редактирования.",
+      label: "design",
+      focus: true,
+      order: 0,
+      createdAt: Date.now() - 3000,
+    },
+    {
+      id: "card-3",
+      columnId: "review",
+      title: "Проверить сохранение",
+      description: "Карточки должны оставаться после перезагрузки страницы.",
+      label: "dev",
+      focus: false,
+      order: 0,
+      createdAt: Date.now() - 2000,
+    },
+    {
+      id: "card-4",
+      columnId: "done",
+      title: "Создать первую доску",
+      description: "Стартовый шаблон готов к изменению под команду.",
+      label: "ops",
+      focus: false,
+      order: 0,
+      createdAt: Date.now() - 1000,
+    },
+  ],
+};
+
+let state = loadBoard();
+let theme = loadTheme();
+let labels = loadLabels();
+let activeCardId = null;
+let activeColumnId = null;
+let quickColumnId = state.columns[0]?.id || "";
+let longPressTimer = null;
+let pendingTouch = null;
+let touchDrag = null;
+let suppressClickUntil = 0;
+let recognition = null;
+let recognitionTarget = null;
+let isRecording = false;
+let committedVoiceText = "";
+
+const boardEl = document.querySelector("#board");
+const totalCardsEl = document.querySelector("#totalCards");
+const doneCardsEl = document.querySelector("#doneCards");
+const focusCardsEl = document.querySelector("#focusCards");
+const scrimEl = document.querySelector("#scrim");
+
+const cardSheet = document.querySelector("#cardSheet");
+const cardForm = document.querySelector("#cardForm");
+const sheetTitle = document.querySelector("#sheetTitle");
+const cardTitleInput = document.querySelector("#cardTitleInput");
+const cardDescriptionInput = document.querySelector("#cardDescriptionInput");
+const cardColumnInput = document.querySelector("#cardColumnInput");
+const cardLabelInput = document.querySelector("#cardLabelInput");
+const cardFocusInput = document.querySelector("#cardFocusInput");
+const cardStatusInput = document.querySelector("#cardStatusInput");
+const deleteCardButton = document.querySelector("#deleteCardButton");
+
+const columnSheet = document.querySelector("#columnSheet");
+const columnForm = document.querySelector("#columnForm");
+const columnSheetTitle = document.querySelector("#columnSheetTitle");
+const columnTitleInput = document.querySelector("#columnTitleInput");
+const deleteColumnButton = document.querySelector("#deleteColumnButton");
+const saveColumnButton = document.querySelector("#saveColumnButton");
+
+const searchSheet = document.querySelector("#searchSheet");
+const searchInput = document.querySelector("#searchInput");
+const searchResults = document.querySelector("#searchResults");
+
+const themeSheet = document.querySelector("#themeSheet");
+const themeForm = document.querySelector("#themeForm");
+const accentColorInput = document.querySelector("#accentColorInput");
+const bgColorInput = document.querySelector("#bgColorInput");
+const panelColorInput = document.querySelector("#panelColorInput");
+const inkColorInput = document.querySelector("#inkColorInput");
+const backgroundGrid = document.querySelector("#backgroundGrid");
+const backgroundFileInput = document.querySelector("#backgroundFileInput");
+
+const voiceSheet = document.querySelector("#voiceSheet");
+const voiceForm = document.querySelector("#voiceForm");
+const voiceTextInput = document.querySelector("#voiceTextInput");
+const voiceColumnInput = document.querySelector("#voiceColumnInput");
+const voiceLabelInput = document.querySelector("#voiceLabelInput");
+const voiceFocusInput = document.querySelector("#voiceFocusInput");
+const voiceStatusInput = document.querySelector("#voiceStatusInput");
+const recordVoiceButton = document.querySelector("#recordVoiceButton");
+const voiceStatus = document.querySelector("#voiceStatus");
+const voiceHint = document.querySelector("#voiceHint");
+const dictateDescriptionButton = document.querySelector("#dictateDescriptionButton");
+
+const labelsSheet = document.querySelector("#labelsSheet");
+const labelsForm = document.querySelector("#labelsForm");
+const labelsList = document.querySelector("#labelsList");
+const newLabelInput = document.querySelector("#newLabelInput");
+
+document.querySelector("#menuButton").addEventListener("click", openSearchSheet);
+document.querySelector("#addCardButton").addEventListener("click", () => openCardSheet());
+document.querySelector("#addColumnButton").addEventListener("click", () => openColumnSheet());
+document.querySelector("#searchButton").addEventListener("click", openSearchSheet);
+document.querySelector("#themeButton").addEventListener("click", openThemeSheet);
+document.querySelector("#voiceButton").addEventListener("click", openVoiceSheet);
+document.querySelector("#closeSheetButton").addEventListener("click", closeSheets);
+document.querySelector("#closeColumnButton").addEventListener("click", closeSheets);
+document.querySelector("#closeSearchButton").addEventListener("click", closeSheets);
+document.querySelector("#closeThemeButton").addEventListener("click", closeSheets);
+document.querySelector("#closeVoiceButton").addEventListener("click", closeSheets);
+document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
+document.querySelector("#clearButton").addEventListener("click", resetBoard);
+scrimEl.addEventListener("click", closeSheets);
+
+cardForm.addEventListener("submit", saveCard);
+columnForm.addEventListener("submit", saveColumn);
+themeForm.addEventListener("submit", saveTheme);
+voiceForm.addEventListener("submit", saveVoiceCard);
+labelsForm.addEventListener("submit", saveLabels);
+deleteCardButton.addEventListener("click", deleteActiveCard);
+deleteColumnButton.addEventListener("click", deleteActiveColumn);
+searchInput.addEventListener("input", renderSearch);
+document.querySelector("#editLabelsButton").addEventListener("click", openLabelsSheet);
+document.querySelector("#editVoiceLabelsButton").addEventListener("click", openLabelsSheet);
+document.querySelector("#addLabelButton").addEventListener("click", addLabelDraft);
+recordVoiceButton.addEventListener("click", () => toggleVoiceRecognition("voice-card"));
+dictateDescriptionButton.addEventListener("click", () => toggleVoiceRecognition("description"));
+document.querySelector("#clearVoiceTextButton").addEventListener("click", clearVoiceText);
+document.querySelector("#resetThemeButton").addEventListener("click", resetTheme);
+backgroundFileInput.addEventListener("change", uploadBackground);
+cardFocusInput.addEventListener("change", () => {
+  if (cardFocusInput.checked && cardStatusInput.value === "planned") {
+    cardStatusInput.value = "today";
+  }
+});
+cardStatusInput.addEventListener("change", () => {
+  if (cardStatusInput.value === "today") {
+    cardFocusInput.checked = true;
+  }
+});
+voiceFocusInput.addEventListener("change", () => {
+  if (voiceFocusInput.checked && voiceStatusInput.value === "planned") {
+    voiceStatusInput.value = "today";
+  }
+});
+voiceStatusInput.addEventListener("change", () => {
+  if (voiceStatusInput.value === "today") {
+    voiceFocusInput.checked = true;
+  }
+});
+document.querySelector("#resetLabelsButton").addEventListener("click", resetLabels);
+document.querySelectorAll("[data-preset]").forEach((button) => {
+  button.addEventListener("click", () => previewTheme(themePresets[button.dataset.preset]));
+});
+[accentColorInput, bgColorInput, panelColorInput, inkColorInput].forEach((input) => {
+  input.addEventListener("input", previewThemeFromInputs);
+});
+
+applyTheme(theme);
+render();
+
+function loadBoard() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) {
+    return structuredClone(defaultBoard);
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed.columns) || !Array.isArray(parsed.cards)) {
+      return structuredClone(defaultBoard);
+    }
+    return normalizeBoard(parsed);
+  } catch {
+    return structuredClone(defaultBoard);
+  }
+}
+
+function persist() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function normalizeBoard(board) {
+  const nextBoard = structuredClone(board);
+  nextBoard.columns.forEach((column) => {
+    nextBoard.cards
+      .filter((card) => card.columnId === column.id)
+      .sort(sortCards)
+      .forEach((card, index) => {
+        card.order = index;
+      });
+  });
+  return nextBoard;
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (!saved) {
+    return { ...defaultTheme };
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    return {
+      accent: normalizeHex(parsed.accent, defaultTheme.accent),
+      bg: normalizeHex(parsed.bg, defaultTheme.bg),
+      panel: normalizeHex(parsed.panel, defaultTheme.panel),
+      ink: normalizeHex(parsed.ink, defaultTheme.ink),
+      background: normalizeBackgroundId(parsed.background, defaultTheme.background),
+      customBackground: typeof parsed.customBackground === "string" ? parsed.customBackground : "",
+    };
+  } catch {
+    return { ...defaultTheme };
+  }
+}
+
+function loadLabels() {
+  const saved = localStorage.getItem(LABELS_KEY);
+  if (!saved) {
+    return structuredClone(defaultLabels);
+  }
+
+  try {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed)) {
+      const safeLabels = parsed
+        .map((label, index) => normalizeLabelObject(label, index))
+        .filter(Boolean);
+      return safeLabels.length ? safeLabels : structuredClone(defaultLabels);
+    }
+
+    // Migrate the older object shape: { product: "..." }.
+    return defaultLabels.map((label) => ({
+      ...label,
+      name: normalizeLabel(parsed[label.id], label.name),
+    }));
+  } catch {
+    return structuredClone(defaultLabels);
+  }
+}
+
+function persistTheme() {
+  localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+}
+
+function persistLabels() {
+  localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
+}
+
+function applyTheme(nextTheme) {
+  const root = document.documentElement;
+  const accentStrong = mixColors(nextTheme.accent, "#000000", 0.22);
+  const panelSoft = mixColors(nextTheme.panel, nextTheme.bg, 0.34);
+  const line = mixColors(nextTheme.ink, nextTheme.panel, 0.86);
+
+  root.style.setProperty("--accent", nextTheme.accent);
+  root.style.setProperty("--accent-strong", accentStrong);
+  root.style.setProperty("--accent-soft", hexToRgba(nextTheme.accent, 0.16));
+  root.style.setProperty("--bg", nextTheme.bg);
+  root.style.setProperty("--panel", nextTheme.panel);
+  root.style.setProperty("--panel-2", panelSoft);
+  root.style.setProperty("--ink", nextTheme.ink);
+  root.style.setProperty("--muted", mixColors(nextTheme.ink, nextTheme.panel, 0.42));
+  root.style.setProperty("--line", line);
+  root.style.setProperty("--app-background", getBackgroundCss(nextTheme));
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", accentStrong);
+}
+
+function render() {
+  renderLabelOptions();
+  renderColumnOptions();
+  renderStats();
+  boardEl.innerHTML = "";
+
+  state.columns.forEach((column) => {
+    const cards = state.cards
+      .filter((card) => card.columnId === column.id)
+      .sort(sortCards);
+
+    const section = document.createElement("section");
+    section.className = "column";
+    section.dataset.columnId = column.id;
+
+    const header = document.createElement("div");
+    header.className = "column-header";
+    header.innerHTML = `
+      <div class="column-title">
+        <button class="column-name-button" type="button" aria-label="Переименовать ${escapeHtml(column.title)}">
+          ${escapeHtml(column.title)}
+        </button>
+        <span class="counter">${cards.length}</span>
+      </div>
+      <div class="column-tools">
+        <button class="column-edit" type="button" aria-label="Редактировать ${escapeHtml(column.title)}">✎</button>
+        <button class="column-add" type="button" aria-label="Добавить карточку в ${escapeHtml(column.title)}">+</button>
+      </div>
+    `;
+
+    const list = document.createElement("div");
+    list.className = "card-list";
+    list.dataset.columnId = column.id;
+    list.addEventListener("dragover", onDragOver);
+    list.addEventListener("dragleave", onDragLeave);
+    list.addEventListener("drop", onDrop);
+
+    if (cards.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "Перетащите карточку сюда";
+      list.append(empty);
+    }
+
+    cards.forEach((card) => list.append(createCardElement(card)));
+    header.querySelector(".column-name-button").addEventListener("click", () => openColumnSheet(column.id));
+    header.querySelector(".column-edit").addEventListener("click", () => openColumnSheet(column.id));
+    header.querySelector(".column-add").addEventListener("click", () => openCardSheet(null, column.id));
+    section.append(header, list);
+    boardEl.append(section);
+  });
+}
+
+function createCardElement(card) {
+  const button = document.createElement("button");
+  button.className = "task-card";
+  button.type = "button";
+  button.draggable = true;
+  button.dataset.cardId = card.id;
+  const status = card.status || (card.focus ? "today" : "planned");
+  button.classList.add(`status-${status}`);
+  button.innerHTML = `
+    <h3>${escapeHtml(card.title)}</h3>
+    ${card.description ? `<p>${escapeHtml(card.description)}</p>` : ""}
+    <div class="card-foot">
+      <div class="card-badges">
+        <span class="label" style="--label-color: ${escapeHtml(getLabelColor(card.label))}">${getLabelName(card.label)}</span>
+        <span class="status-chip">${statusNames[status] || statusNames.planned}</span>
+      </div>
+      ${card.focus ? '<span class="focus-dot" aria-label="В фокусе"></span>' : ""}
+    </div>
+  `;
+
+  button.addEventListener("click", () => {
+    if (Date.now() < suppressClickUntil) {
+      return;
+    }
+    openCardSheet(card.id);
+  });
+  button.addEventListener("pointerdown", (event) => prepareTouchDrag(event, button, card.id));
+  button.addEventListener("pointermove", moveTouchDrag);
+  button.addEventListener("pointerup", finishTouchDrag);
+  button.addEventListener("pointercancel", cancelTouchDrag);
+  button.addEventListener("dragstart", (event) => {
+    event.dataTransfer.setData("text/plain", card.id);
+    button.classList.add("is-dragging");
+  });
+  button.addEventListener("dragend", () => button.classList.remove("is-dragging"));
+  return button;
+}
+
+function prepareTouchDrag(event, cardEl, cardId) {
+  if (event.pointerType === "mouse") {
+    return;
+  }
+
+  clearTimeout(longPressTimer);
+  const rect = cardEl.getBoundingClientRect();
+  const offsetX = event.clientX - rect.left;
+  const offsetY = event.clientY - rect.top;
+  pendingTouch = {
+    startX: event.clientX,
+    startY: event.clientY,
+  };
+
+  longPressTimer = setTimeout(() => {
+    touchDrag = {
+      cardId,
+      cardEl,
+      offsetX,
+      offsetY,
+      overColumnId: null,
+      overIndex: null,
+      startedAt: Date.now(),
+    };
+    cardEl.setPointerCapture(event.pointerId);
+    cardEl.classList.add("is-lifted");
+    cardEl.style.left = `${event.clientX - offsetX}px`;
+    cardEl.style.top = `${event.clientY - offsetY}px`;
+    document.body.style.overflow = "hidden";
+  }, 260);
+}
+
+function moveTouchDrag(event) {
+  if (!touchDrag) {
+    if (pendingTouch) {
+      const distance = Math.hypot(event.clientX - pendingTouch.startX, event.clientY - pendingTouch.startY);
+      if (distance > 9) {
+        clearTimeout(longPressTimer);
+        pendingTouch = null;
+      }
+    }
+    return;
+  }
+
+  event.preventDefault();
+  touchDrag.cardEl.style.left = `${event.clientX - touchDrag.offsetX}px`;
+  touchDrag.cardEl.style.top = `${event.clientY - touchDrag.offsetY}px`;
+  touchDrag.cardEl.hidden = true;
+  const target = document.elementFromPoint(event.clientX, event.clientY);
+  touchDrag.cardEl.hidden = false;
+  const list = target?.closest?.(".card-list");
+
+  document.querySelectorAll(".card-list").forEach((item) => item.classList.remove("is-over"));
+  if (list) {
+    list.classList.add("is-over");
+    touchDrag.overColumnId = list.dataset.columnId;
+    touchDrag.overIndex = getDropIndex(list, event.clientY, touchDrag.cardId);
+  }
+}
+
+function finishTouchDrag(event) {
+  clearTimeout(longPressTimer);
+  pendingTouch = null;
+  if (!touchDrag) {
+    return;
+  }
+
+  event.preventDefault();
+  suppressClickUntil = Date.now() + 450;
+  const { cardId, overColumnId, overIndex } = touchDrag;
+  cleanupTouchDrag();
+
+  if (overColumnId) {
+    moveCardToPosition(cardId, overColumnId, overIndex);
+    quickColumnId = overColumnId;
+    persist();
+    render();
+  }
+}
+
+function cancelTouchDrag() {
+  clearTimeout(longPressTimer);
+  pendingTouch = null;
+  cleanupTouchDrag();
+}
+
+function cleanupTouchDrag() {
+  if (!touchDrag) {
+    return;
+  }
+
+  touchDrag.cardEl.classList.remove("is-lifted");
+  touchDrag.cardEl.style.left = "";
+  touchDrag.cardEl.style.top = "";
+  document.querySelectorAll(".card-list").forEach((item) => item.classList.remove("is-over"));
+  document.body.style.overflow = "";
+  touchDrag = null;
+}
+
+function renderColumnOptions() {
+  const options = state.columns
+    .map((column) => `<option value="${column.id}">${escapeHtml(column.title)}</option>`)
+    .join("");
+  cardColumnInput.innerHTML = options;
+  voiceColumnInput.innerHTML = options;
+}
+
+function renderLabelOptions() {
+  const fallbackLabel = labels[0]?.id || "product";
+  const currentCardLabel = cardLabelInput.value || fallbackLabel;
+  const currentVoiceLabel = voiceLabelInput.value || fallbackLabel;
+  const options = labels
+    .map((label) => `<option value="${label.id}">${escapeHtml(label.name)}</option>`)
+    .join("");
+
+  cardLabelInput.innerHTML = options;
+  voiceLabelInput.innerHTML = options;
+  cardLabelInput.value = getLabelById(currentCardLabel) ? currentCardLabel : fallbackLabel;
+  voiceLabelInput.value = getLabelById(currentVoiceLabel) ? currentVoiceLabel : fallbackLabel;
+}
+
+function renderStats() {
+  const doneColumn = state.columns.find((column) => column.title.toLowerCase().includes("готов"));
+  totalCardsEl.textContent = state.cards.length;
+  doneCardsEl.textContent = doneColumn
+    ? state.cards.filter((card) => card.columnId === doneColumn.id).length
+    : 0;
+  focusCardsEl.textContent = state.cards.filter((card) => card.focus).length;
+}
+
+function openCardSheet(cardId = null, columnId = quickColumnId) {
+  activeCardId = cardId;
+  const card = state.cards.find((item) => item.id === cardId);
+
+  sheetTitle.textContent = card ? "Редактировать карточку" : "Новая карточка";
+  cardTitleInput.value = card?.title || "";
+  cardDescriptionInput.value = card?.description || "";
+  cardColumnInput.value = card?.columnId || columnId || state.columns[0]?.id;
+  cardLabelInput.value = card?.label || labels[0]?.id || "product";
+  cardFocusInput.checked = Boolean(card?.focus);
+  cardStatusInput.value = card?.status || (card?.focus ? "today" : "planned");
+  deleteCardButton.hidden = !card;
+  openSheet(cardSheet);
+  cardTitleInput.focus();
+}
+
+function openColumnSheet(columnId = null) {
+  activeColumnId = columnId;
+  const column = state.columns.find((item) => item.id === columnId);
+  const hasCards = state.cards.some((card) => card.columnId === columnId);
+
+  columnSheetTitle.textContent = column ? "Редактировать колонку" : "Новая колонка";
+  columnTitleInput.value = column?.title || "";
+  deleteColumnButton.hidden = !column;
+  deleteColumnButton.disabled = hasCards;
+  deleteColumnButton.textContent = hasCards ? "Есть карточки" : "Удалить";
+  saveColumnButton.textContent = column ? "Сохранить" : "Добавить колонку";
+  openSheet(columnSheet);
+  columnTitleInput.focus();
+}
+
+function openSearchSheet() {
+  searchInput.value = "";
+  renderSearch();
+  openSheet(searchSheet);
+  searchInput.focus();
+}
+
+function openThemeSheet() {
+  renderBackgroundChoices();
+  syncThemeInputs(theme);
+  markSelectedPreset();
+  openSheet(themeSheet);
+}
+
+function openLabelsSheet() {
+  renderLabelsEditor();
+  newLabelInput.value = "";
+  openSheet(labelsSheet);
+  newLabelInput.focus();
+}
+
+function openVoiceSheet() {
+  renderColumnOptions();
+  voiceColumnInput.value = quickColumnId || state.columns[0]?.id;
+  voiceLabelInput.value = labels[0]?.id || "product";
+  voiceFocusInput.checked = true;
+  voiceStatusInput.value = "today";
+  setVoiceState("Готов к диктовке", "Нажмите кнопку и говорите. Текст попадет в карточку.");
+  openSheet(voiceSheet);
+  voiceTextInput.focus();
+}
+
+function openSheet(sheet) {
+  document.querySelectorAll(".sheet").forEach((item) => {
+    item.classList.remove("is-open");
+    item.setAttribute("aria-hidden", "true");
+  });
+  scrimEl.hidden = false;
+  sheet.classList.add("is-open");
+  sheet.setAttribute("aria-hidden", "false");
+}
+
+function closeSheets() {
+  stopRecognition();
+  document.querySelectorAll(".sheet").forEach((item) => {
+    item.classList.remove("is-open");
+    item.setAttribute("aria-hidden", "true");
+  });
+  scrimEl.hidden = true;
+  activeCardId = null;
+  activeColumnId = null;
+}
+
+function saveCard(event) {
+  event.preventDefault();
+  const payload = {
+    title: cardTitleInput.value.trim(),
+    description: cardDescriptionInput.value.trim(),
+    columnId: cardColumnInput.value,
+    label: cardLabelInput.value,
+    focus: cardFocusInput.checked,
+    status: cardStatusInput.value,
+  };
+
+  if (!payload.title) {
+    return;
+  }
+
+  if (activeCardId) {
+    const previousCard = state.cards.find((card) => card.id === activeCardId);
+    const movedToNewColumn = previousCard && previousCard.columnId !== payload.columnId;
+    const nextOrder = movedToNewColumn ? getNextOrder(payload.columnId) : previousCard?.order;
+    state.cards = state.cards.map((card) =>
+      card.id === activeCardId ? { ...card, ...payload, order: nextOrder ?? card.order ?? 0 } : card,
+    );
+    state = normalizeBoard(state);
+  } else {
+    state.cards.push({
+      id: crypto.randomUUID(),
+      ...payload,
+      order: getNextOrder(payload.columnId),
+      createdAt: Date.now(),
+    });
+  }
+
+  quickColumnId = payload.columnId;
+  persist();
+  render();
+  closeSheets();
+}
+
+function saveColumn(event) {
+  event.preventDefault();
+  const title = columnTitleInput.value.trim();
+  if (!title) {
+    return;
+  }
+
+  if (activeColumnId) {
+    state.columns = state.columns.map((column) =>
+      column.id === activeColumnId ? { ...column, title } : column,
+    );
+    persist();
+    render();
+    closeSheets();
+    return;
+  }
+
+  const id = `column-${crypto.randomUUID()}`;
+  state.columns.push({ id, title });
+  quickColumnId = id;
+  persist();
+  render();
+  closeSheets();
+}
+
+function deleteActiveColumn() {
+  if (!activeColumnId) {
+    return;
+  }
+
+  const hasCards = state.cards.some((card) => card.columnId === activeColumnId);
+  if (hasCards || state.columns.length <= 1) {
+    return;
+  }
+
+  state.columns = state.columns.filter((column) => column.id !== activeColumnId);
+  quickColumnId = state.columns[0]?.id || "";
+  persist();
+  render();
+  closeSheets();
+}
+
+function deleteActiveCard() {
+  if (!activeCardId) {
+    return;
+  }
+  state.cards = state.cards.filter((card) => card.id !== activeCardId);
+  persist();
+  render();
+  closeSheets();
+}
+
+function saveVoiceCard(event) {
+  event.preventDefault();
+  const text = voiceTextInput.value.trim();
+  if (!text) {
+    setVoiceState("Текста пока нет", "Надиктуйте мысль или введите ее вручную.");
+    return;
+  }
+
+  const title = createTitleFromVoice(text);
+  state.cards.push({
+    id: crypto.randomUUID(),
+    columnId: voiceColumnInput.value,
+    title,
+    description: text,
+    label: voiceLabelInput.value,
+    focus: voiceFocusInput.checked,
+    status: voiceStatusInput.value,
+    order: getNextOrder(voiceColumnInput.value),
+    createdAt: Date.now(),
+  });
+
+  quickColumnId = voiceColumnInput.value;
+  persist();
+  render();
+  clearVoiceText();
+  closeSheets();
+}
+
+function resetBoard() {
+  const wantsReset = confirm("Сбросить доску к стартовому шаблону?");
+  if (!wantsReset) {
+    return;
+  }
+  state = structuredClone(defaultBoard);
+  quickColumnId = state.columns[0]?.id || "";
+  persist();
+  render();
+  closeSheets();
+}
+
+function saveTheme(event) {
+  event.preventDefault();
+  theme = readThemeInputs();
+  applyTheme(theme);
+  persistTheme();
+  markSelectedPreset();
+  closeSheets();
+}
+
+function resetTheme() {
+  previewTheme(defaultTheme);
+  theme = { ...defaultTheme };
+  persistTheme();
+  renderBackgroundChoices();
+}
+
+function previewTheme(nextTheme) {
+  syncThemeInputs(nextTheme);
+  theme = { ...nextTheme };
+  applyTheme(theme);
+  persistTheme();
+  markSelectedPreset(theme);
+  renderBackgroundChoices();
+}
+
+function previewThemeFromInputs() {
+  theme = readThemeInputs();
+  applyTheme(theme);
+  persistTheme();
+  markSelectedPreset(theme);
+}
+
+function syncThemeInputs(nextTheme) {
+  accentColorInput.value = nextTheme.accent;
+  bgColorInput.value = nextTheme.bg;
+  panelColorInput.value = nextTheme.panel;
+  inkColorInput.value = nextTheme.ink;
+}
+
+function readThemeInputs() {
+  return {
+    accent: accentColorInput.value,
+    bg: bgColorInput.value,
+    panel: panelColorInput.value,
+    ink: inkColorInput.value,
+    background: theme.background,
+    customBackground: theme.customBackground,
+  };
+}
+
+function markSelectedPreset(nextTheme = readThemeInputs()) {
+  document.querySelectorAll("[data-preset]").forEach((button) => {
+    const preset = themePresets[button.dataset.preset];
+    const isSelected =
+      preset.accent === nextTheme.accent &&
+      preset.bg === nextTheme.bg &&
+      preset.panel === nextTheme.panel &&
+      preset.ink === nextTheme.ink;
+    button.classList.toggle("is-selected", isSelected);
+  });
+}
+
+function renderBackgroundChoices() {
+  backgroundGrid.innerHTML = "";
+  backgroundPresets.forEach((preset) => {
+    const button = document.createElement("button");
+    button.className = "background-choice";
+    button.type = "button";
+    button.style.setProperty("--choice-bg", preset.css);
+    button.classList.toggle("is-selected", theme.background === preset.id && !theme.customBackground);
+    button.setAttribute("aria-label", `Выбрать фон ${preset.id}`);
+    button.addEventListener("click", () => {
+      theme = { ...theme, background: preset.id, customBackground: "" };
+      applyTheme(theme);
+      persistTheme();
+      renderBackgroundChoices();
+    });
+    backgroundGrid.append(button);
+  });
+}
+
+function uploadBackground(event) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    theme = {
+      ...theme,
+      background: "custom",
+      customBackground: String(reader.result || ""),
+    };
+    applyTheme(theme);
+    persistTheme();
+    renderBackgroundChoices();
+    backgroundFileInput.value = "";
+  });
+  reader.readAsDataURL(file);
+}
+
+function saveLabels(event) {
+  event.preventDefault();
+  labels = readLabelsEditor();
+  persistLabels();
+  renderLabelOptions();
+  render();
+  closeSheets();
+}
+
+function resetLabels() {
+  labels = structuredClone(defaultLabels);
+  persistLabels();
+  renderLabelsEditor();
+  renderLabelOptions();
+  render();
+}
+
+function renderLabelsEditor() {
+  labelsList.innerHTML = "";
+  labels.forEach((label) => {
+    const row = document.createElement("div");
+    row.className = "label-editor-row";
+    row.dataset.labelId = label.id;
+    row.innerHTML = `
+      <input class="label-color-input" type="color" value="${escapeHtml(label.color)}" aria-label="Цвет метки ${escapeHtml(label.name)}" />
+      <input class="label-name-input" type="text" maxlength="22" value="${escapeHtml(label.name)}" aria-label="Название метки" required />
+      <button class="label-delete-button" type="button" aria-label="Удалить метку">×</button>
+    `;
+    const deleteButton = row.querySelector(".label-delete-button");
+    const isUsed = state.cards.some((card) => card.label === label.id);
+    deleteButton.disabled = isUsed || labels.length <= 1;
+    deleteButton.title = isUsed ? "Эта метка используется в карточках" : "";
+    deleteButton.addEventListener("click", () => {
+      labels = labels.filter((item) => item.id !== label.id);
+      renderLabelsEditor();
+      renderLabelOptions();
+    });
+    labelsList.append(row);
+  });
+}
+
+function readLabelsEditor() {
+  const rows = [...labelsList.querySelectorAll(".label-editor-row")];
+  const nextLabels = rows.map((row, index) => {
+    const previous = labels.find((label) => label.id === row.dataset.labelId);
+    return {
+      id: previous?.id || `label-${crypto.randomUUID()}`,
+      name: normalizeLabel(row.querySelector(".label-name-input").value, `Метка ${index + 1}`),
+      color: normalizeHex(row.querySelector(".label-color-input").value, previous?.color || pickLabelColor(index)),
+    };
+  });
+  return nextLabels.length ? nextLabels : structuredClone(defaultLabels);
+}
+
+function addLabelDraft() {
+  const name = normalizeLabel(newLabelInput.value, `Метка ${labels.length + 1}`);
+  labels = readLabelsEditor();
+  labels.push({
+    id: `label-${crypto.randomUUID()}`,
+    name,
+    color: pickLabelColor(labels.length),
+  });
+  newLabelInput.value = "";
+  renderLabelsEditor();
+  renderLabelOptions();
+}
+
+function getLabelName(label) {
+  return getLabelById(label)?.name || label;
+}
+
+function getLabelColor(label) {
+  return getLabelById(label)?.color || "#e2e8f0";
+}
+
+function getLabelById(labelId) {
+  return labels.find((label) => label.id === labelId);
+}
+
+function toggleVoiceRecognition(target) {
+  if (isRecording && recognitionTarget === target) {
+    stopRecognition();
+    return;
+  }
+
+  startRecognition(target);
+}
+
+function startRecognition(target) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    setVoiceState(
+      "Диктовка недоступна",
+      "Этот браузер не поддерживает распознавание речи. Можно вставить текст вручную.",
+    );
+    return;
+  }
+
+  stopRecognition();
+  recognitionTarget = target;
+  committedVoiceText = target === "description" ? cardDescriptionInput.value.trim() : voiceTextInput.value.trim();
+  recognition = new SpeechRecognition();
+  recognition.lang = "ru-RU";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    setRecordingUi(true, target);
+    setVoiceState("Слушаю", "Говорите спокойно. Можно остановить запись этой же кнопкой.");
+  };
+
+  recognition.onresult = (event) => {
+    let finalText = "";
+    let interimText = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index][0].transcript.trim();
+      if (event.results[index].isFinal) {
+        finalText += ` ${transcript}`;
+      } else {
+        interimText += ` ${transcript}`;
+      }
+    }
+
+    if (finalText) {
+      committedVoiceText = joinVoiceText(committedVoiceText, finalText);
+    }
+
+    writeVoiceText(target, joinVoiceText(committedVoiceText, interimText));
+  };
+
+  recognition.onerror = (event) => {
+    const messages = {
+      "not-allowed": "Браузер не дал доступ к микрофону.",
+      "no-speech": "Речь не распознана. Попробуйте сказать чуть ближе к микрофону.",
+      network: "Не удалось подключить распознавание речи.",
+    };
+    setVoiceState("Запись остановлена", messages[event.error] || "Попробуйте начать диктовку еще раз.");
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    setRecordingUi(false, target);
+    recognition = null;
+    recognitionTarget = null;
+  };
+
+  try {
+    recognition.start();
+  } catch {
+    setVoiceState("Не получилось начать", "Закройте запись и попробуйте снова.");
+  }
+}
+
+function stopRecognition() {
+  if (recognition) {
+    recognition.stop();
+  }
+  isRecording = false;
+  setRecordingUi(false, recognitionTarget);
+}
+
+function setRecordingUi(recording, target) {
+  recordVoiceButton.classList.toggle("is-recording", recording && target === "voice-card");
+  recordVoiceButton.setAttribute("aria-pressed", String(recording && target === "voice-card"));
+  dictateDescriptionButton.classList.toggle("is-recording", recording && target === "description");
+  dictateDescriptionButton.querySelector("strong").textContent =
+    recording && target === "description" ? "Остановить диктовку" : "Надиктовать описание";
+}
+
+function writeVoiceText(target, text) {
+  if (target === "description") {
+    cardDescriptionInput.value = text.slice(0, cardDescriptionInput.maxLength || 260);
+    return;
+  }
+  voiceTextInput.value = text.slice(0, voiceTextInput.maxLength || 900);
+}
+
+function joinVoiceText(base, addition) {
+  return [base, addition.trim()].filter(Boolean).join(" ").replace(/\s+/g, " ").trimStart();
+}
+
+function setVoiceState(status, hint) {
+  voiceStatus.textContent = status;
+  voiceHint.textContent = hint;
+}
+
+function clearVoiceText() {
+  voiceTextInput.value = "";
+  committedVoiceText = "";
+  setVoiceState("Готов к диктовке", "Нажмите кнопку и говорите. Текст попадет в карточку.");
+}
+
+function createTitleFromVoice(text) {
+  const words = text.replace(/\s+/g, " ").trim().split(" ");
+  const title = words.slice(0, 7).join(" ");
+  return title.length > 72 ? `${title.slice(0, 69)}...` : title;
+}
+
+function renderSearch() {
+  const query = searchInput.value.trim().toLowerCase();
+  const matches = state.cards.filter((card) => {
+    const column = state.columns.find((item) => item.id === card.columnId);
+    const haystack = `${card.title} ${card.description} ${getLabelName(card.label)} ${column?.title || ""}`;
+    return haystack.toLowerCase().includes(query);
+  });
+
+  searchResults.innerHTML = "";
+  if (!query) {
+    searchResults.innerHTML = '<div class="empty-state">Начните вводить текст</div>';
+    return;
+  }
+
+  if (matches.length === 0) {
+    searchResults.innerHTML = '<div class="empty-state">Ничего не найдено</div>';
+    return;
+  }
+
+  matches.forEach((card) => {
+    const column = state.columns.find((item) => item.id === card.columnId);
+    const result = document.createElement("button");
+    result.className = "search-result";
+    result.type = "button";
+    result.innerHTML = `
+      <strong>${escapeHtml(card.title)}</strong>
+      <span>${escapeHtml(column?.title || "Без колонки")} · ${escapeHtml(getLabelName(card.label))}</span>
+    `;
+    result.addEventListener("click", () => openCardSheet(card.id));
+    searchResults.append(result);
+  });
+}
+
+function onDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add("is-over");
+}
+
+function onDragLeave(event) {
+  event.currentTarget.classList.remove("is-over");
+}
+
+function onDrop(event) {
+  event.preventDefault();
+  const cardId = event.dataTransfer.getData("text/plain");
+  const columnId = event.currentTarget.dataset.columnId;
+  const dropIndex = getDropIndex(event.currentTarget, event.clientY, cardId);
+  event.currentTarget.classList.remove("is-over");
+
+  moveCardToPosition(cardId, columnId, dropIndex);
+  quickColumnId = columnId;
+  persist();
+  render();
+}
+
+function moveCardToPosition(cardId, columnId, dropIndex) {
+  const movingCard = state.cards.find((card) => card.id === cardId);
+  if (!movingCard) {
+    return;
+  }
+
+  const otherCards = state.cards.filter((card) => card.id !== cardId);
+  const targetCards = otherCards.filter((card) => card.columnId === columnId).sort(sortCards);
+  const safeIndex = Math.max(0, Math.min(dropIndex ?? targetCards.length, targetCards.length));
+  const movedCard = { ...movingCard, columnId };
+  targetCards.splice(safeIndex, 0, movedCard);
+
+  const reorderedTargetCards = targetCards.map((card, index) => ({ ...card, order: index }));
+  const targetIds = new Set(reorderedTargetCards.map((card) => card.id));
+  state.cards = otherCards
+    .filter((card) => !targetIds.has(card.id))
+    .concat(reorderedTargetCards);
+  state = normalizeBoard(state);
+}
+
+function getDropIndex(list, clientY, draggedCardId) {
+  const cards = [...list.querySelectorAll(".task-card:not(.is-dragging):not(.is-lifted)")].filter(
+    (card) => card.dataset.cardId !== draggedCardId,
+  );
+
+  const afterCard = cards.find((card) => {
+    const rect = card.getBoundingClientRect();
+    return clientY < rect.top + rect.height / 2;
+  });
+
+  return afterCard ? cards.indexOf(afterCard) : cards.length;
+}
+
+function getNextOrder(columnId) {
+  return state.cards.filter((card) => card.columnId === columnId).length;
+}
+
+function sortCards(a, b) {
+  const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+  const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+  return orderA - orderB || (a.createdAt || 0) - (b.createdAt || 0);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalizeHex(value, fallback) {
+  return /^#[0-9a-f]{6}$/i.test(value || "") ? value : fallback;
+}
+
+function normalizeBackgroundId(value, fallback) {
+  if (value === "custom") {
+    return value;
+  }
+  return backgroundPresets.some((preset) => preset.id === value) ? value : fallback;
+}
+
+function getBackgroundCss(nextTheme) {
+  if (nextTheme.customBackground) {
+    return `linear-gradient(rgba(248, 250, 252, 0.72), rgba(248, 250, 252, 0.78)), url("${nextTheme.customBackground}")`;
+  }
+
+  const preset = backgroundPresets.find((item) => item.id === nextTheme.background) || backgroundPresets[0];
+  return preset.css;
+}
+
+function normalizeLabel(value, fallback) {
+  const label = String(value || "").trim();
+  return label ? label.slice(0, 22) : fallback;
+}
+
+function normalizeLabelObject(label, index) {
+  if (!label || typeof label !== "object") {
+    return null;
+  }
+
+  const id = String(label.id || `label-${index}`).trim();
+  return {
+    id,
+    name: normalizeLabel(label.name, `Метка ${index + 1}`),
+    color: normalizeHex(label.color, pickLabelColor(index)),
+  };
+}
+
+function pickLabelColor(index) {
+  const colors = ["#bae6fd", "#ddd6fe", "#bbf7d0", "#fed7aa", "#fecdd3", "#fde68a", "#c7d2fe", "#a7f3d0"];
+  return colors[index % colors.length];
+}
+
+function hexToRgb(hex) {
+  const value = hex.replace("#", "");
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b]
+    .map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function mixColors(fromHex, toHex, amount) {
+  const from = hexToRgb(fromHex);
+  const to = hexToRgb(toHex);
+  return rgbToHex({
+    r: from.r + (to.r - from.r) * amount,
+    g: from.g + (to.g - from.g) * amount,
+    b: from.b + (to.b - from.b) * amount,
+  });
+}
+
+function hexToRgba(hex, alpha) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+</script>
+  </body>
+</html>
+
