@@ -1925,13 +1925,15 @@ function placeDropMarker(list, dropIndex, draggedCardId, marker) {
 }
 
 function autoScrollDuringDrag(clientX, clientY) {
-  const edge = 72;
   const boardRect = boardEl.getBoundingClientRect();
+  const edge = Math.min(120, Math.max(68, boardRect.width * 0.24));
+  const leftDistance = Math.max(0, clientX - boardRect.left);
+  const rightDistance = Math.max(0, boardRect.right - clientX);
   let horizontal = 0;
-  if (clientX < boardRect.left + edge) {
-    horizontal = -26;
-  } else if (clientX > boardRect.right - edge) {
-    horizontal = 26;
+  if (leftDistance < edge) {
+    horizontal = -Math.ceil(((edge - leftDistance) / edge) * 34);
+  } else if (rightDistance < edge) {
+    horizontal = Math.ceil(((edge - rightDistance) / edge) * 34);
   }
 
   const currentList = touchDrag?.overColumnId
@@ -1966,13 +1968,39 @@ function autoScrollDuringDrag(clientX, clientY) {
 
     if (autoScrollState.horizontal) {
       boardEl.scrollLeft += autoScrollState.horizontal;
+      updateDropTargetFromPoint();
     }
     if (autoScrollState.vertical && autoScrollState.list) {
       autoScrollState.list.scrollTop += autoScrollState.vertical;
+      updateDropTargetFromPoint();
     }
     autoScrollFrame = requestAnimationFrame(step);
   };
   autoScrollFrame = requestAnimationFrame(step);
+}
+
+function updateDropTargetFromPoint() {
+  if (!touchDrag) {
+    return;
+  }
+
+  const target = document.elementFromPoint(touchDrag.clientX, touchDrag.clientY);
+  const list = target?.closest?.(".card-list");
+  if (!list) {
+    return;
+  }
+
+  if (list !== touchDrag.currentList) {
+    touchDrag.currentList?.classList.remove("is-over");
+    touchDrag.currentList?.closest(".column")?.classList.remove("is-drop-target");
+    list.classList.add("is-over");
+    list.closest(".column")?.classList.add("is-drop-target");
+    touchDrag.currentList = list;
+  }
+
+  touchDrag.overColumnId = list.dataset.columnId;
+  touchDrag.overIndex = getDropIndex(list, touchDrag.clientY, touchDrag.cardId);
+  placeDropMarker(list, touchDrag.overIndex, touchDrag.cardId, touchDrag.marker);
 }
 
 function stopAutoScroll() {
