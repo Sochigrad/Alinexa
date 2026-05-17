@@ -2406,7 +2406,7 @@ async function signUpWithEmail(event) {
   }
 
   setAuthBusy(true);
-  const { error } = await registerWithEmail(email, password);
+  const { data, error } = await registerWithEmail(email, password);
   setAuthBusy(false);
   if (error) {
     setAuthStatus(`Регистрация не прошла: ${translateAuthError(error.message)}`, "error");
@@ -2414,7 +2414,14 @@ async function signUpWithEmail(event) {
   }
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
-  setAuthStatus("Регистрация создана. Проверьте e-mail и подтвердите аккаунт по ссылке из письма.", "success");
+  if (data?.session?.user || data?.user) {
+    currentUser = data.session?.user || data.user;
+    updateAuthUi(currentUser);
+    setAuthMode("sign-in");
+    setAuthStatus("Регистрация выполнена. Аккаунт создан.", "success");
+    return;
+  }
+  setAuthStatus("Аккаунт создан. Теперь можно войти через e-mail и пароль.", "success");
 }
 
 async function registerWithEmail(email, password) {
