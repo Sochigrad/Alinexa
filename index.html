@@ -84,8 +84,8 @@ button {
 
 .topbar {
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
-  gap: 12px;
+  grid-template-columns: 44px 1fr 44px 44px;
+  gap: 8px;
   align-items: center;
   padding: 14px 14px 8px;
 }
@@ -890,6 +890,38 @@ textarea {
   gap: 10px;
 }
 
+.auth-status {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.auth-status.is-success {
+  border-color: color-mix(in srgb, #16a34a 40%, var(--line));
+  background: color-mix(in srgb, #16a34a 10%, var(--panel));
+  color: #166534;
+}
+
+.auth-status.is-error {
+  border-color: rgba(194, 65, 12, 0.28);
+  background: #fff7ed;
+  color: var(--danger);
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.auth-actions button {
+  width: 100%;
+}
+
 .color-field {
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -1135,6 +1167,7 @@ textarea {
           <p>Мобильная доска</p>
           <h1 id="boardTitle">Alinexa</h1>
         </div>
+        <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт">IN</button>
         <button class="avatar-button" id="clearButton" type="button" aria-label="Сбросить доску">AX</button>
       </header>
 
@@ -1386,10 +1419,38 @@ textarea {
       </form>
     </aside>
 
+    <aside class="sheet compact" id="authSheet" aria-hidden="true" aria-label="Аккаунт">
+      <form id="authForm">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <h2>Аккаунт</h2>
+          <button class="ghost-button" id="closeAuthButton" type="button">Закрыть</button>
+        </div>
+        <div class="auth-status" id="authStatus">Войдите или зарегистрируйтесь через e-mail.</div>
+        <label>
+          E-mail
+          <input id="authEmailInput" type="email" autocomplete="email" required />
+        </label>
+        <label>
+          Пароль
+          <input id="authPasswordInput" type="password" autocomplete="current-password" minlength="8" />
+        </label>
+        <div class="auth-actions">
+          <button class="primary-button" id="signInButton" type="submit">Войти</button>
+          <button class="ghost-button" id="signUpButton" type="button">Регистрация</button>
+          <button class="ghost-button" id="resetPasswordButton" type="button">Сброс пароля</button>
+          <button class="danger-button" id="signOutButton" type="button" hidden>Выйти</button>
+        </div>
+      </form>
+    </aside>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
 const STORAGE_KEY = "taskflow-board-v1";
 const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
+const SUPABASE_URL = "";
+const SUPABASE_ANON_KEY = "";
 
 const defaultTheme = {
   accent: "#0f766e",
@@ -1520,6 +1581,8 @@ let suppressClickUntil = 0;
 let autoScrollFrame = null;
 let autoScrollState = { horizontal: 0, vertical: 0, list: null };
 let dragFrame = null;
+let supabaseClient = null;
+let currentUser = null;
 let recognition = null;
 let recognitionTarget = null;
 let isRecording = false;
@@ -1579,6 +1642,14 @@ const labelsForm = document.querySelector("#labelsForm");
 const labelsList = document.querySelector("#labelsList");
 const newLabelInput = document.querySelector("#newLabelInput");
 
+const authSheet = document.querySelector("#authSheet");
+const authForm = document.querySelector("#authForm");
+const authStatus = document.querySelector("#authStatus");
+const authEmailInput = document.querySelector("#authEmailInput");
+const authPasswordInput = document.querySelector("#authPasswordInput");
+const signOutButton = document.querySelector("#signOutButton");
+const accountButton = document.querySelector("#accountButton");
+
 document.querySelector("#menuButton").addEventListener("click", openSearchSheet);
 document.querySelector("#addCardButton").addEventListener("click", () => openCardSheet());
 document.querySelector("#addColumnButton").addEventListener("click", () => openColumnSheet());
@@ -1591,7 +1662,9 @@ document.querySelector("#closeSearchButton").addEventListener("click", closeShee
 document.querySelector("#closeThemeButton").addEventListener("click", closeSheets);
 document.querySelector("#closeVoiceButton").addEventListener("click", closeSheets);
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
+document.querySelector("#closeAuthButton").addEventListener("click", closeSheets);
 document.querySelector("#clearButton").addEventListener("click", resetBoard);
+accountButton.addEventListener("click", openAuthSheet);
 scrimEl.addEventListener("click", closeSheets);
 
 cardForm.addEventListener("submit", saveCard);
@@ -1599,6 +1672,7 @@ columnForm.addEventListener("submit", saveColumn);
 themeForm.addEventListener("submit", saveTheme);
 voiceForm.addEventListener("submit", saveVoiceCard);
 labelsForm.addEventListener("submit", saveLabels);
+authForm.addEventListener("submit", signInWithEmail);
 deleteCardButton.addEventListener("click", deleteActiveCard);
 deleteColumnButton.addEventListener("click", deleteActiveColumn);
 searchInput.addEventListener("input", renderSearch);
@@ -1631,6 +1705,9 @@ voiceStatusInput.addEventListener("change", () => {
   }
 });
 document.querySelector("#resetLabelsButton").addEventListener("click", resetLabels);
+document.querySelector("#signUpButton").addEventListener("click", signUpWithEmail);
+document.querySelector("#resetPasswordButton").addEventListener("click", sendPasswordResetEmail);
+signOutButton.addEventListener("click", signOut);
 document.querySelectorAll("[data-preset]").forEach((button) => {
   button.addEventListener("click", () => previewTheme(themePresets[button.dataset.preset]));
 });
@@ -1640,6 +1717,7 @@ document.querySelectorAll("[data-preset]").forEach((button) => {
 
 applyTheme(theme);
 render();
+initAuth();
 
 function loadBoard() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -2166,6 +2244,155 @@ function renderStats() {
     ? state.cards.filter((card) => card.columnId === doneColumn.id).length
     : 0;
   focusCardsEl.textContent = state.cards.filter((card) => card.focus).length;
+}
+
+async function initAuth() {
+  supabaseClient = getSupabaseClient();
+  if (!supabaseClient) {
+    updateAuthUi(null);
+    setAuthStatus(
+      "Подключение e-mail регистрации еще не настроено. Нужно вставить SUPABASE_URL и SUPABASE_ANON_KEY в app.js.",
+      "error",
+    );
+    return;
+  }
+
+  const { data } = await supabaseClient.auth.getSession();
+  currentUser = data.session?.user || null;
+  updateAuthUi(currentUser);
+
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    currentUser = session?.user || null;
+    updateAuthUi(currentUser);
+  });
+}
+
+function getSupabaseClient() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !window.supabase?.createClient) {
+    return null;
+  }
+  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+}
+
+function updateAuthUi(user) {
+  accountButton.textContent = user?.email ? user.email.slice(0, 2).toUpperCase() : "IN";
+  accountButton.setAttribute("aria-label", user?.email ? `Аккаунт ${user.email}` : "Войти в аккаунт");
+  signOutButton.hidden = !user;
+  if (user) {
+    authEmailInput.value = user.email || "";
+    setAuthStatus(`Вы вошли как ${user.email}.`, "success");
+  }
+}
+
+function openAuthSheet() {
+  openSheet(authSheet);
+  if (!currentUser) {
+    authEmailInput.focus();
+  }
+}
+
+async function signInWithEmail(event) {
+  event.preventDefault();
+  if (!ensureAuthReady()) {
+    return;
+  }
+
+  const email = authEmailInput.value.trim();
+  const password = authPasswordInput.value;
+  if (!password) {
+    setAuthStatus("Введите пароль.", "error");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    setAuthStatus(error.message, "error");
+    return;
+  }
+  authPasswordInput.value = "";
+  setAuthStatus("Вход выполнен.", "success");
+}
+
+async function signUpWithEmail() {
+  if (!ensureAuthReady()) {
+    return;
+  }
+
+  const email = authEmailInput.value.trim();
+  const password = authPasswordInput.value;
+  if (!email || password.length < 8) {
+    setAuthStatus("Введите e-mail и пароль минимум 8 символов.", "error");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: window.location.origin + window.location.pathname,
+    },
+  });
+  if (error) {
+    setAuthStatus(error.message, "error");
+    return;
+  }
+  authPasswordInput.value = "";
+  setAuthStatus("Регистрация создана. Проверьте e-mail и подтвердите аккаунт по ссылке из письма.", "success");
+}
+
+async function sendPasswordResetEmail() {
+  if (!ensureAuthReady()) {
+    return;
+  }
+
+  const email = authEmailInput.value.trim();
+  if (!email) {
+    setAuthStatus("Введите e-mail для восстановления пароля.", "error");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  if (error) {
+    setAuthStatus(error.message, "error");
+    return;
+  }
+  setAuthStatus("Письмо для восстановления пароля отправлено.", "success");
+}
+
+async function signOut() {
+  if (!ensureAuthReady()) {
+    return;
+  }
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  authPasswordInput.value = "";
+  updateAuthUi(null);
+  setAuthStatus("Вы вышли из аккаунта.", "success");
+}
+
+function ensureAuthReady() {
+  if (supabaseClient) {
+    return true;
+  }
+  setAuthStatus(
+    "Нужно подключить Supabase: создать проект, включить Email Auth и вставить SUPABASE_URL / SUPABASE_ANON_KEY.",
+    "error",
+  );
+  return false;
+}
+
+function setAuthStatus(message, tone = "") {
+  authStatus.textContent = message;
+  authStatus.classList.toggle("is-success", tone === "success");
+  authStatus.classList.toggle("is-error", tone === "error");
 }
 
 function openCardSheet(cardId = null, columnId = quickColumnId) {
