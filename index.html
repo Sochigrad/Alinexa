@@ -343,7 +343,8 @@ button {
   position: fixed;
   z-index: 40;
   pointer-events: none;
-  transform: rotate(1.5deg) scale(1.03);
+  will-change: transform;
+  transform: translate3d(0, 0, 0) rotate(1deg) scale(1.02);
   box-shadow: 0 22px 52px rgba(15, 23, 42, 0.24);
 }
 
@@ -1384,6 +1385,7 @@ let touchDrag = null;
 let suppressClickUntil = 0;
 let autoScrollFrame = null;
 let autoScrollState = { horizontal: 0, vertical: 0, list: null };
+let dragFrame = null;
 let recognition = null;
 let recognitionTarget = null;
 let isRecording = false;
@@ -1754,20 +1756,11 @@ function moveTouchDrag(event) {
   }
 
   event.preventDefault();
-  clearTextSelection();
-  autoScrollDuringDrag(event.clientX, event.clientY);
-  touchDrag.cardEl.style.left = `${event.clientX - touchDrag.offsetX}px`;
-  touchDrag.cardEl.style.top = `${event.clientY - touchDrag.offsetY}px`;
-  touchDrag.cardEl.hidden = true;
-  const target = document.elementFromPoint(event.clientX, event.clientY);
-  touchDrag.cardEl.hidden = false;
-  const list = target?.closest?.(".card-list");
+  touchDrag.clientX = event.clientX;
+  touchDrag.clientY = event.clientY;
 
-  document.querySelectorAll(".card-list").forEach((item) => item.classList.remove("is-over"));
-  if (list) {
-    list.classList.add("is-over");
-    touchDrag.overColumnId = list.dataset.columnId;
-    touchDrag.overIndex = getDropIndex(list, event.clientY, touchDrag.cardId);
+  if (!dragFrame) {
+    dragFrame = requestAnimationFrame(updateTouchDrag);
   }
 }
 
@@ -1782,6 +1775,11 @@ function startTouchDrag(event) {
   touchDrag = {
     cardId,
     cardEl,
+    originLeft: event.clientX - offsetX,
+    originTop: event.clientY - offsetY,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    currentList: null,
     offsetX,
     offsetY,
     overColumnId: cardEl.closest(".column")?.dataset.columnId || null,
@@ -1802,7 +1800,34 @@ function startTouchDrag(event) {
   cardEl.style.width = `${width}px`;
   cardEl.style.left = `${event.clientX - offsetX}px`;
   cardEl.style.top = `${event.clientY - offsetY}px`;
+  cardEl.style.transform = "translate3d(0, 0, 0) rotate(1deg) scale(1.02)";
   suppressClickUntil = Date.now() + 650;
+}
+
+function updateTouchDrag() {
+  dragFrame = null;
+  if (!touchDrag) {
+    return;
+  }
+
+  const deltaX = touchDrag.clientX - touchDrag.offsetX - touchDrag.originLeft;
+  const deltaY = touchDrag.clientY - touchDrag.offsetY - touchDrag.originTop;
+  touchDrag.cardEl.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) rotate(1deg) scale(1.02)`;
+
+  autoScrollDuringDrag(touchDrag.clientX, touchDrag.clientY);
+  const target = document.elementFromPoint(touchDrag.clientX, touchDrag.clientY);
+  const list = target?.closest?.(".card-list");
+
+  if (list !== touchDrag.currentList) {
+    touchDrag.currentList?.classList.remove("is-over");
+    list?.classList.add("is-over");
+    touchDrag.currentList = list || null;
+  }
+
+  if (list) {
+    touchDrag.overColumnId = list.dataset.columnId;
+    touchDrag.overIndex = getDropIndex(list, touchDrag.clientY, touchDrag.cardId);
+  }
 }
 
 function finishTouchDrag(event) {
@@ -1832,16 +1857,21 @@ function cancelTouchDrag() {
 }
 
 function cleanupTouchDrag() {
+  if (dragFrame) {
+    cancelAnimationFrame(dragFrame);
+    dragFrame = null;
+  }
   stopAutoScroll();
   if (!touchDrag) {
     return;
   }
 
+  touchDrag.currentList?.classList.remove("is-over");
   touchDrag.cardEl.classList.remove("is-lifted");
   touchDrag.cardEl.style.width = "";
   touchDrag.cardEl.style.left = "";
   touchDrag.cardEl.style.top = "";
-  document.querySelectorAll(".card-list").forEach((item) => item.classList.remove("is-over"));
+  touchDrag.cardEl.style.transform = "";
   document.body.style.overflow = "";
   document.body.classList.remove("is-card-dragging");
   clearTextSelection();
@@ -1849,13 +1879,13 @@ function cleanupTouchDrag() {
 }
 
 function autoScrollDuringDrag(clientX, clientY) {
-  const edge = 58;
+  const edge = 72;
   const boardRect = boardEl.getBoundingClientRect();
   let horizontal = 0;
   if (clientX < boardRect.left + edge) {
-    horizontal = -18;
+    horizontal = -26;
   } else if (clientX > boardRect.right - edge) {
-    horizontal = 18;
+    horizontal = 26;
   }
 
   const currentList = touchDrag?.overColumnId
@@ -1865,9 +1895,9 @@ function autoScrollDuringDrag(clientX, clientY) {
   if (currentList) {
     const listRect = currentList.getBoundingClientRect();
     if (clientY < listRect.top + edge) {
-      vertical = -14;
+      vertical = -18;
     } else if (clientY > listRect.bottom - edge) {
-      vertical = 14;
+      vertical = 18;
     }
   }
 
