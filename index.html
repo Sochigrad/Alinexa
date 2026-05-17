@@ -189,6 +189,18 @@ button {
   user-select: none;
   -webkit-user-select: none;
   -ms-user-select: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.column.is-drop-target {
+  border-color: color-mix(in srgb, var(--accent) 72%, white);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    0 18px 44px rgba(15, 23, 42, 0.16);
 }
 
 .column-header {
@@ -288,6 +300,14 @@ button {
 
 .card-list.is-over {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.drop-marker {
+  min-height: 54px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 72%, white);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46);
 }
 
 .task-card {
@@ -1780,6 +1800,7 @@ function startTouchDrag(event) {
     clientX: event.clientX,
     clientY: event.clientY,
     currentList: null,
+    marker: createDropMarker(cardEl),
     offsetX,
     offsetY,
     overColumnId: cardEl.closest(".column")?.dataset.columnId || null,
@@ -1820,13 +1841,16 @@ function updateTouchDrag() {
 
   if (list !== touchDrag.currentList) {
     touchDrag.currentList?.classList.remove("is-over");
+    touchDrag.currentList?.closest(".column")?.classList.remove("is-drop-target");
     list?.classList.add("is-over");
+    list?.closest(".column")?.classList.add("is-drop-target");
     touchDrag.currentList = list || null;
   }
 
   if (list) {
     touchDrag.overColumnId = list.dataset.columnId;
     touchDrag.overIndex = getDropIndex(list, touchDrag.clientY, touchDrag.cardId);
+    placeDropMarker(list, touchDrag.overIndex, touchDrag.cardId, touchDrag.marker);
   }
 }
 
@@ -1867,6 +1891,8 @@ function cleanupTouchDrag() {
   }
 
   touchDrag.currentList?.classList.remove("is-over");
+  touchDrag.currentList?.closest(".column")?.classList.remove("is-drop-target");
+  touchDrag.marker?.remove();
   touchDrag.cardEl.classList.remove("is-lifted");
   touchDrag.cardEl.style.width = "";
   touchDrag.cardEl.style.left = "";
@@ -1876,6 +1902,26 @@ function cleanupTouchDrag() {
   document.body.classList.remove("is-card-dragging");
   clearTextSelection();
   touchDrag = null;
+}
+
+function createDropMarker(cardEl) {
+  const marker = document.createElement("div");
+  marker.className = "drop-marker";
+  marker.style.minHeight = `${Math.max(54, Math.round(cardEl.getBoundingClientRect().height))}px`;
+  return marker;
+}
+
+function placeDropMarker(list, dropIndex, draggedCardId, marker) {
+  const cards = [...list.querySelectorAll(".task-card:not(.is-dragging):not(.is-lifted)")].filter(
+    (card) => card.dataset.cardId !== draggedCardId,
+  );
+  const safeIndex = Math.max(0, Math.min(dropIndex ?? cards.length, cards.length));
+  const beforeCard = cards[safeIndex] || null;
+  if (beforeCard) {
+    list.insertBefore(marker, beforeCard);
+  } else {
+    list.append(marker);
+  }
 }
 
 function autoScrollDuringDrag(clientX, clientY) {
