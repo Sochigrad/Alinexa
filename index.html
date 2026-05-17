@@ -922,6 +922,10 @@ textarea {
   gap: 10px;
 }
 
+#authForm.is-sign-up .auth-actions {
+  grid-template-columns: 1fr;
+}
+
 .auth-actions button {
   width: 100%;
 }
@@ -2322,7 +2326,7 @@ function updateAuthUi(user) {
 }
 
 function openAuthSheet() {
-  setAuthMode(currentUser ? "sign-in" : authMode);
+  setAuthMode("sign-in");
   openSheet(authSheet);
   if (!currentUser) {
     authEmailInput.focus();
@@ -2343,6 +2347,7 @@ function toggleAuthMode() {
 function setAuthMode(mode) {
   authMode = mode;
   const isSignUp = authMode === "sign-up";
+  authForm.classList.toggle("is-sign-up", isSignUp);
   authTitle.textContent = isSignUp ? "Регистрация" : "Аккаунт";
   authSheet.setAttribute("aria-label", isSignUp ? "Регистрация" : "Аккаунт");
   authPasswordRepeatLabel.hidden = !isSignUp;
@@ -2352,7 +2357,8 @@ function setAuthMode(mode) {
   }
   authPasswordInput.autocomplete = isSignUp ? "new-password" : "current-password";
   signInButton.textContent = isSignUp ? "Зарегистрироваться" : "Войти";
-  signUpButton.textContent = isSignUp ? "Войти" : "Регистрация";
+  signUpButton.textContent = "Регистрация";
+  signUpButton.hidden = isSignUp;
   resetPasswordButton.hidden = isSignUp;
   signOutButton.hidden = !currentUser || isSignUp;
   setAuthStatus(
