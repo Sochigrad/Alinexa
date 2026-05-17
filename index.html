@@ -1649,6 +1649,9 @@ const authStatus = document.querySelector("#authStatus");
 const authEmailInput = document.querySelector("#authEmailInput");
 const authPasswordInput = document.querySelector("#authPasswordInput");
 const signOutButton = document.querySelector("#signOutButton");
+const signInButton = document.querySelector("#signInButton");
+const signUpButton = document.querySelector("#signUpButton");
+const resetPasswordButton = document.querySelector("#resetPasswordButton");
 const accountButton = document.querySelector("#accountButton");
 
 document.querySelector("#menuButton").addEventListener("click", openSearchSheet);
@@ -1706,8 +1709,8 @@ voiceStatusInput.addEventListener("change", () => {
   }
 });
 document.querySelector("#resetLabelsButton").addEventListener("click", resetLabels);
-document.querySelector("#signUpButton").addEventListener("click", signUpWithEmail);
-document.querySelector("#resetPasswordButton").addEventListener("click", sendPasswordResetEmail);
+signUpButton.addEventListener("click", signUpWithEmail);
+resetPasswordButton.addEventListener("click", sendPasswordResetEmail);
 signOutButton.addEventListener("click", signOut);
 document.querySelectorAll("[data-preset]").forEach((button) => {
   button.addEventListener("click", () => previewTheme(themePresets[button.dataset.preset]));
@@ -2306,14 +2309,15 @@ async function signInWithEmail(event) {
 
   const email = authEmailInput.value.trim();
   const password = authPasswordInput.value;
-  if (!password) {
-    setAuthStatus("Введите пароль.", "error");
+  if (!validateAuthFields(email, password)) {
     return;
   }
 
+  setAuthBusy(true);
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  setAuthBusy(false);
   if (error) {
-    setAuthStatus(error.message, "error");
+    setAuthStatus("Войти не получилось. Если аккаунта еще нет, нажмите «Регистрация».", "error");
     return;
   }
   authPasswordInput.value = "";
@@ -2327,11 +2331,11 @@ async function signUpWithEmail() {
 
   const email = authEmailInput.value.trim();
   const password = authPasswordInput.value;
-  if (!email || password.length < 8) {
-    setAuthStatus("Введите e-mail и пароль минимум 8 символов.", "error");
+  if (!validateAuthFields(email, password)) {
     return;
   }
 
+  setAuthBusy(true);
   const { error } = await supabaseClient.auth.signUp({
     email,
     password,
@@ -2339,8 +2343,9 @@ async function signUpWithEmail() {
       emailRedirectTo: window.location.origin + window.location.pathname,
     },
   });
+  setAuthBusy(false);
   if (error) {
-    setAuthStatus(error.message, "error");
+    setAuthStatus(`Регистрация не прошла: ${translateAuthError(error.message)}`, "error");
     return;
   }
   authPasswordInput.value = "";
@@ -2358,9 +2363,11 @@ async function sendPasswordResetEmail() {
     return;
   }
 
+  setAuthBusy(true);
   const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin + window.location.pathname,
   });
+  setAuthBusy(false);
   if (error) {
     setAuthStatus(error.message, "error");
     return;
@@ -2394,6 +2401,40 @@ function setAuthStatus(message, tone = "") {
   authStatus.textContent = message;
   authStatus.classList.toggle("is-success", tone === "success");
   authStatus.classList.toggle("is-error", tone === "error");
+}
+
+function validateAuthFields(email, password) {
+  if (!email || !email.includes("@")) {
+    setAuthStatus("Введите корректный e-mail.", "error");
+    return false;
+  }
+  if (!password || password.length < 8) {
+    setAuthStatus("Пароль должен быть минимум 8 символов.", "error");
+    return false;
+  }
+  return true;
+}
+
+function setAuthBusy(isBusy) {
+  [signInButton, signUpButton, resetPasswordButton, signOutButton].forEach((button) => {
+    button.disabled = isBusy;
+  });
+  if (isBusy) {
+    setAuthStatus("Отправляю запрос...", "");
+  }
+}
+
+function translateAuthError(message) {
+  if (/already registered|already been registered|User already/i.test(message)) {
+    return "этот e-mail уже зарегистрирован. Попробуйте войти или сбросить пароль.";
+  }
+  if (/invalid email/i.test(message)) {
+    return "некорректный e-mail.";
+  }
+  if (/password/i.test(message)) {
+    return "пароль не подходит требованиям. Используйте минимум 8 символов.";
+  }
+  return message;
 }
 
 function openCardSheet(cardId = null, columnId = quickColumnId) {
