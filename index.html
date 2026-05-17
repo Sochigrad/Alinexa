@@ -304,7 +304,7 @@ button {
   text-align: left;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
   cursor: grab;
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
   -webkit-user-drag: none;
   -webkit-user-select: none;
@@ -342,7 +342,6 @@ button {
 .task-card.is-lifted {
   position: fixed;
   z-index: 40;
-  width: min(276px, calc(100vw - 36px));
   pointer-events: none;
   transform: rotate(1.5deg) scale(1.03);
   box-shadow: 0 22px 52px rgba(15, 23, 42, 0.24);
@@ -620,7 +619,8 @@ textarea {
 
 .sheet-actions {
   display: grid;
-  grid-template-columns: 1fr 1.4fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 10px;
 }
 
@@ -630,6 +630,8 @@ textarea {
   min-height: 44px;
   border-radius: 8px;
   font-weight: 850;
+  width: 100%;
+  line-height: 1.2;
 }
 
 .primary-button {
@@ -840,7 +842,8 @@ textarea {
 
 .labels-add-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.42fr);
+  align-items: stretch;
   gap: 10px;
 }
 
@@ -1666,7 +1669,7 @@ function createCardElement(card) {
   const button = document.createElement("button");
   button.className = "task-card";
   button.type = "button";
-  button.draggable = true;
+  button.draggable = !window.matchMedia("(pointer: coarse)").matches;
   button.dataset.cardId = card.id;
   const status = card.status || (card.focus ? "today" : "planned");
   button.classList.add(`status-${status}`);
@@ -1713,6 +1716,7 @@ function prepareTouchDrag(event, cardEl, cardId) {
     return;
   }
 
+  event.preventDefault();
   clearTimeout(longPressTimer);
   const rect = cardEl.getBoundingClientRect();
   pendingTouch = {
@@ -1723,19 +1727,27 @@ function prepareTouchDrag(event, cardEl, cardId) {
     startY: event.clientY,
     offsetX: event.clientX - rect.left,
     offsetY: event.clientY - rect.top,
+    width: rect.width,
   };
+
+  try {
+    cardEl.setPointerCapture(event.pointerId);
+  } catch {
+    // Pointer capture is best effort on mobile browsers.
+  }
 
   longPressTimer = setTimeout(() => {
     startTouchDrag(event);
-  }, 120);
+  }, 70);
 }
 
 function moveTouchDrag(event) {
   if (!touchDrag) {
     if (pendingTouch) {
       const distance = Math.hypot(event.clientX - pendingTouch.startX, event.clientY - pendingTouch.startY);
-      if (distance > 7) {
+      if (distance > 4) {
         startTouchDrag(event);
+        moveTouchDrag(event);
       }
     }
     return;
@@ -1766,7 +1778,7 @@ function startTouchDrag(event) {
 
   clearTimeout(longPressTimer);
   clearTextSelection();
-  const { cardEl, cardId, offsetX, offsetY, pointerId } = pendingTouch;
+  const { cardEl, cardId, offsetX, offsetY, pointerId, width } = pendingTouch;
   touchDrag = {
     cardId,
     cardEl,
@@ -1787,6 +1799,7 @@ function startTouchDrag(event) {
   cardEl.classList.add("is-lifted");
   document.body.classList.add("is-card-dragging");
   document.body.style.overflow = "hidden";
+  cardEl.style.width = `${width}px`;
   cardEl.style.left = `${event.clientX - offsetX}px`;
   cardEl.style.top = `${event.clientY - offsetY}px`;
   suppressClickUntil = Date.now() + 650;
@@ -1825,6 +1838,7 @@ function cleanupTouchDrag() {
   }
 
   touchDrag.cardEl.classList.remove("is-lifted");
+  touchDrag.cardEl.style.width = "";
   touchDrag.cardEl.style.left = "";
   touchDrag.cardEl.style.top = "";
   document.querySelectorAll(".card-list").forEach((item) => item.classList.remove("is-over"));
