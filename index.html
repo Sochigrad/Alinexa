@@ -1435,6 +1435,10 @@ textarea {
           Пароль
           <input id="authPasswordInput" type="password" autocomplete="current-password" minlength="8" />
         </label>
+        <label>
+          Повторите пароль
+          <input id="authPasswordRepeatInput" type="password" autocomplete="new-password" minlength="8" />
+        </label>
         <div class="auth-actions">
           <button class="primary-button" id="signInButton" type="submit">Войти</button>
           <button class="ghost-button" id="signUpButton" type="button">Регистрация</button>
@@ -1648,6 +1652,7 @@ const authForm = document.querySelector("#authForm");
 const authStatus = document.querySelector("#authStatus");
 const authEmailInput = document.querySelector("#authEmailInput");
 const authPasswordInput = document.querySelector("#authPasswordInput");
+const authPasswordRepeatInput = document.querySelector("#authPasswordRepeatInput");
 const signOutButton = document.querySelector("#signOutButton");
 const signInButton = document.querySelector("#signInButton");
 const signUpButton = document.querySelector("#signUpButton");
@@ -1710,6 +1715,12 @@ voiceStatusInput.addEventListener("change", () => {
 });
 document.querySelector("#resetLabelsButton").addEventListener("click", resetLabels);
 signUpButton.addEventListener("click", signUpWithEmail);
+signUpButton.addEventListener("pointerup", (event) => {
+  if (event.pointerType === "touch") {
+    event.preventDefault();
+    signUpWithEmail(event);
+  }
+});
 resetPasswordButton.addEventListener("click", sendPasswordResetEmail);
 signOutButton.addEventListener("click", signOut);
 document.querySelectorAll("[data-preset]").forEach((button) => {
@@ -2321,17 +2332,20 @@ async function signInWithEmail(event) {
     return;
   }
   authPasswordInput.value = "";
+  authPasswordRepeatInput.value = "";
   setAuthStatus("Вход выполнен.", "success");
 }
 
-async function signUpWithEmail() {
+async function signUpWithEmail(event) {
+  event?.preventDefault();
   if (!ensureAuthReady()) {
     return;
   }
 
   const email = authEmailInput.value.trim();
   const password = authPasswordInput.value;
-  if (!validateAuthFields(email, password)) {
+  const passwordRepeat = authPasswordRepeatInput.value;
+  if (!validateAuthFields(email, password) || !validateRepeatedPassword(password, passwordRepeat)) {
     return;
   }
 
@@ -2349,6 +2363,7 @@ async function signUpWithEmail() {
     return;
   }
   authPasswordInput.value = "";
+  authPasswordRepeatInput.value = "";
   setAuthStatus("Регистрация создана. Проверьте e-mail и подтвердите аккаунт по ссылке из письма.", "success");
 }
 
@@ -2382,6 +2397,7 @@ async function signOut() {
   await supabaseClient.auth.signOut();
   currentUser = null;
   authPasswordInput.value = "";
+  authPasswordRepeatInput.value = "";
   updateAuthUi(null);
   setAuthStatus("Вы вышли из аккаунта.", "success");
 }
@@ -2410,6 +2426,20 @@ function validateAuthFields(email, password) {
   }
   if (!password || password.length < 8) {
     setAuthStatus("Пароль должен быть минимум 8 символов.", "error");
+    return false;
+  }
+  return true;
+}
+
+function validateRepeatedPassword(password, passwordRepeat) {
+  if (!passwordRepeat) {
+    setAuthStatus("Повторите пароль для регистрации.", "error");
+    authPasswordRepeatInput.focus();
+    return false;
+  }
+  if (password !== passwordRepeat) {
+    setAuthStatus("Пароли не совпадают. Введите одинаковый пароль дважды.", "error");
+    authPasswordRepeatInput.focus();
     return false;
   }
   return true;
