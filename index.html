@@ -2314,7 +2314,7 @@ function getSupabaseClient() {
 function updateAuthUi(user) {
   accountButton.textContent = user?.email ? user.email.slice(0, 2).toUpperCase() : "IN";
   accountButton.setAttribute("aria-label", user?.email ? `Аккаунт ${user.email}` : "Войти в аккаунт");
-  signOutButton.hidden = !user;
+  signOutButton.hidden = !user || authMode === "sign-up";
   if (user) {
     authEmailInput.value = user.email || "";
     setAuthStatus(`Вы вошли как ${user.email}.`, "success");
@@ -2400,13 +2400,7 @@ async function signUpWithEmail(event) {
   }
 
   setAuthBusy(true);
-  const { error } = await supabaseClient.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: APP_URL,
-    },
-  });
+  const { error } = await registerWithEmail(email, password);
   setAuthBusy(false);
   if (error) {
     setAuthStatus(`Регистрация не прошла: ${translateAuthError(error.message)}`, "error");
@@ -2415,6 +2409,50 @@ async function signUpWithEmail(event) {
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
   setAuthStatus("Регистрация создана. Проверьте e-mail и подтвердите аккаунт по ссылке из письма.", "success");
+}
+
+async function registerWithEmail(email, password) {
+  try {
+    const result = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: APP_URL,
+      },
+    });
+    if (!result.error || !isNetworkLikeAuthError(result.error.message)) {
+      return result;
+    }
+  } catch (error) {
+    if (!isNetworkLikeAuthError(error.message)) {
+      return { error };
+    }
+  }
+
+  return registerWithEmailFetch(email, password);
+}
+
+async function registerWithEmailFetch(email, password) {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/signup?redirect_to=${encodeURIComponent(APP_URL)}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return {
+        error: new Error(data.msg || data.message || data.error_description || data.error || `HTTP ${response.status}`),
+      };
+    }
+    return { data, error: null };
+  } catch (error) {
+    return { error };
+  }
 }
 
 async function sendPasswordResetEmail() {
@@ -2504,7 +2542,17 @@ function setAuthBusy(isBusy) {
   }
 }
 
+function isNetworkLikeAuthError(message = "") {
+  return /load failed|failed to fetch|network|abort/i.test(message);
+}
+
 function translateAuthError(message) {
+  if (/429|rate limit|too many|over_email_send_rate_limit|email rate/i.test(message)) {
+    return "сейчас Supabase ограничил отправку писем. Подождите немного и попробуйте еще раз, либо подключите свой SMTP для писем Alinexa.";
+  }
+  if (isNetworkLikeAuthError(message)) {
+    return "не удалось связаться с Supabase. Обновите страницу по свежей ссылке и попробуйте еще раз. Если повторяется, вероятнее всего сработал лимит отправки писем.";
+  }
   if (/already registered|already been registered|User already/i.test(message)) {
     return "этот e-mail уже зарегистрирован. Попробуйте войти или сбросить пароль.";
   }
