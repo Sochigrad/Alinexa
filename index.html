@@ -54,6 +54,15 @@ body.is-card-dragging * {
   -ms-user-select: none;
 }
 
+body.is-card-dragging .board {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+}
+
+body.is-card-dragging .column {
+  scroll-snap-align: none;
+}
+
 button,
 input,
 textarea,
@@ -1007,6 +1016,81 @@ textarea {
   }
 }
 
+@media (pointer: coarse) and (max-width: 940px) {
+  .app-shell {
+    max-width: none;
+    overflow: visible;
+  }
+
+  .topbar {
+    padding: 14px 14px 8px;
+  }
+
+  .board {
+    grid-template-columns: none;
+    grid-auto-columns: minmax(300px, calc(100vw - 28px));
+    grid-auto-flow: column;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 14px 104px;
+    scroll-padding-inline: 14px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .column {
+    max-height: calc(100svh - 212px);
+    min-height: 360px;
+    scroll-snap-align: start;
+  }
+
+  .bottom-bar {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    transform: none;
+  }
+
+  .sheet,
+  .sheet.compact {
+    right: 0;
+    left: 0;
+    width: auto;
+    max-height: 94svh;
+    border-radius: 20px 20px 0 0;
+    padding: 8px 14px calc(16px + var(--safe-bottom));
+    transform: translateY(106%);
+  }
+
+  .sheet.is-open {
+    transform: translateY(0);
+  }
+
+  .sheet-head {
+    align-items: flex-start;
+  }
+
+  .sheet-head h2 {
+    font-size: 19px;
+    line-height: 1.15;
+  }
+
+  .field-grid,
+  .theme-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sheet-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  input,
+  textarea,
+  select {
+    min-height: 46px;
+    font-size: 16px;
+  }
+}
+
 </style>
   </head>
   <body>
@@ -1797,6 +1881,7 @@ function startTouchDrag(event) {
     cardEl,
     originLeft: event.clientX - offsetX,
     originTop: event.clientY - offsetY,
+    startX: event.clientX,
     clientX: event.clientX,
     clientY: event.clientY,
     currentList: null,
@@ -1930,10 +2015,14 @@ function autoScrollDuringDrag(clientX, clientY) {
   const leftDistance = Math.max(0, clientX - boardRect.left);
   const rightDistance = Math.max(0, boardRect.right - clientX);
   let horizontal = 0;
+  const dragDistance = clientX - (touchDrag?.startX ?? clientX);
+  if (Math.abs(dragDistance) > 34) {
+    horizontal = Math.sign(dragDistance) * Math.min(22, Math.max(10, Math.abs(dragDistance) / 7));
+  }
   if (leftDistance < edge) {
-    horizontal = -Math.ceil(((edge - leftDistance) / edge) * 34);
+    horizontal = -Math.max(Math.abs(horizontal), Math.ceil(((edge - leftDistance) / edge) * 38));
   } else if (rightDistance < edge) {
-    horizontal = Math.ceil(((edge - rightDistance) / edge) * 34);
+    horizontal = Math.max(horizontal, Math.ceil(((edge - rightDistance) / edge) * 38));
   }
 
   const currentList = touchDrag?.overColumnId
