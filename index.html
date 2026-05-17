@@ -1379,6 +1379,8 @@ let longPressTimer = null;
 let pendingTouch = null;
 let touchDrag = null;
 let suppressClickUntil = 0;
+let autoScrollFrame = null;
+let autoScrollState = { horizontal: 0, vertical: 0, list: null };
 let recognition = null;
 let recognitionTarget = null;
 let isRecording = false;
@@ -1713,40 +1715,27 @@ function prepareTouchDrag(event, cardEl, cardId) {
 
   clearTimeout(longPressTimer);
   const rect = cardEl.getBoundingClientRect();
-  const offsetX = event.clientX - rect.left;
-  const offsetY = event.clientY - rect.top;
   pendingTouch = {
+    cardId,
+    cardEl,
+    pointerId: event.pointerId,
     startX: event.clientX,
     startY: event.clientY,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
   };
 
   longPressTimer = setTimeout(() => {
-    clearTextSelection();
-    touchDrag = {
-      cardId,
-      cardEl,
-      offsetX,
-      offsetY,
-      overColumnId: null,
-      overIndex: null,
-      startedAt: Date.now(),
-    };
-    cardEl.setPointerCapture(event.pointerId);
-    cardEl.classList.add("is-lifted");
-    document.body.classList.add("is-card-dragging");
-    cardEl.style.left = `${event.clientX - offsetX}px`;
-    cardEl.style.top = `${event.clientY - offsetY}px`;
-    document.body.style.overflow = "hidden";
-  }, 260);
+    startTouchDrag(event);
+  }, 120);
 }
 
 function moveTouchDrag(event) {
   if (!touchDrag) {
     if (pendingTouch) {
       const distance = Math.hypot(event.clientX - pendingTouch.startX, event.clientY - pendingTouch.startY);
-      if (distance > 9) {
-        clearTimeout(longPressTimer);
-        pendingTouch = null;
+      if (distance > 7) {
+        startTouchDrag(event);
       }
     }
     return;
@@ -1754,6 +1743,7 @@ function moveTouchDrag(event) {
 
   event.preventDefault();
   clearTextSelection();
+  autoScrollDuringDrag(event.clientX, event.clientY);
   touchDrag.cardEl.style.left = `${event.clientX - touchDrag.offsetX}px`;
   touchDrag.cardEl.style.top = `${event.clientY - touchDrag.offsetY}px`;
   touchDrag.cardEl.hidden = true;
@@ -1767,6 +1757,39 @@ function moveTouchDrag(event) {
     touchDrag.overColumnId = list.dataset.columnId;
     touchDrag.overIndex = getDropIndex(list, event.clientY, touchDrag.cardId);
   }
+}
+
+function startTouchDrag(event) {
+  if (!pendingTouch || touchDrag) {
+    return;
+  }
+
+  clearTimeout(longPressTimer);
+  clearTextSelection();
+  const { cardEl, cardId, offsetX, offsetY, pointerId } = pendingTouch;
+  touchDrag = {
+    cardId,
+    cardEl,
+    offsetX,
+    offsetY,
+    overColumnId: cardEl.closest(".column")?.dataset.columnId || null,
+    overIndex: null,
+    startedAt: Date.now(),
+  };
+  pendingTouch = null;
+
+  try {
+    cardEl.setPointerCapture(pointerId);
+  } catch {
+    // Some mobile browsers drop capture when the finger leaves the original target.
+  }
+
+  cardEl.classList.add("is-lifted");
+  document.body.classList.add("is-card-dragging");
+  document.body.style.overflow = "hidden";
+  cardEl.style.left = `${event.clientX - offsetX}px`;
+  cardEl.style.top = `${event.clientY - offsetY}px`;
+  suppressClickUntil = Date.now() + 650;
 }
 
 function finishTouchDrag(event) {
@@ -1796,6 +1819,7 @@ function cancelTouchDrag() {
 }
 
 function cleanupTouchDrag() {
+  stopAutoScroll();
   if (!touchDrag) {
     return;
   }
@@ -1808,6 +1832,65 @@ function cleanupTouchDrag() {
   document.body.classList.remove("is-card-dragging");
   clearTextSelection();
   touchDrag = null;
+}
+
+function autoScrollDuringDrag(clientX, clientY) {
+  const edge = 58;
+  const boardRect = boardEl.getBoundingClientRect();
+  let horizontal = 0;
+  if (clientX < boardRect.left + edge) {
+    horizontal = -18;
+  } else if (clientX > boardRect.right - edge) {
+    horizontal = 18;
+  }
+
+  const currentList = touchDrag?.overColumnId
+    ? boardEl.querySelector(`.card-list[data-column-id="${CSS.escape(touchDrag.overColumnId)}"]`)
+    : null;
+  let vertical = 0;
+  if (currentList) {
+    const listRect = currentList.getBoundingClientRect();
+    if (clientY < listRect.top + edge) {
+      vertical = -14;
+    } else if (clientY > listRect.bottom - edge) {
+      vertical = 14;
+    }
+  }
+
+  if (!horizontal && !vertical) {
+    stopAutoScroll();
+    return;
+  }
+
+  autoScrollState = { horizontal, vertical, list: currentList };
+
+  if (autoScrollFrame) {
+    return;
+  }
+
+  const step = () => {
+    if (!touchDrag) {
+      stopAutoScroll();
+      return;
+    }
+
+    if (autoScrollState.horizontal) {
+      boardEl.scrollLeft += autoScrollState.horizontal;
+    }
+    if (autoScrollState.vertical && autoScrollState.list) {
+      autoScrollState.list.scrollTop += autoScrollState.vertical;
+    }
+    autoScrollFrame = requestAnimationFrame(step);
+  };
+  autoScrollFrame = requestAnimationFrame(step);
+}
+
+function stopAutoScroll() {
+  if (autoScrollFrame) {
+    cancelAnimationFrame(autoScrollFrame);
+    autoScrollFrame = null;
+  }
+  autoScrollState = { horizontal: 0, vertical: 0, list: null };
 }
 
 function clearTextSelection() {
