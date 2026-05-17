@@ -1423,7 +1423,7 @@ textarea {
       <form id="authForm">
         <div class="sheet-handle"></div>
         <div class="sheet-head">
-          <h2>Аккаунт</h2>
+          <h2 id="authTitle">Аккаунт</h2>
           <button class="ghost-button" id="closeAuthButton" type="button">Закрыть</button>
         </div>
         <div class="auth-status" id="authStatus">Войдите или зарегистрируйтесь через e-mail.</div>
@@ -1435,7 +1435,7 @@ textarea {
           Пароль
           <input id="authPasswordInput" type="password" autocomplete="current-password" minlength="8" />
         </label>
-        <label>
+        <label id="authPasswordRepeatLabel" hidden>
           Повторите пароль
           <input id="authPasswordRepeatInput" type="password" autocomplete="new-password" minlength="8" />
         </label>
@@ -1456,6 +1456,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
+const APP_URL = "https://alinexa.ru/";
 
 const defaultTheme = {
   accent: "#0f766e",
@@ -1649,15 +1650,19 @@ const newLabelInput = document.querySelector("#newLabelInput");
 
 const authSheet = document.querySelector("#authSheet");
 const authForm = document.querySelector("#authForm");
+const authTitle = document.querySelector("#authTitle");
 const authStatus = document.querySelector("#authStatus");
 const authEmailInput = document.querySelector("#authEmailInput");
 const authPasswordInput = document.querySelector("#authPasswordInput");
+const authPasswordRepeatLabel = document.querySelector("#authPasswordRepeatLabel");
 const authPasswordRepeatInput = document.querySelector("#authPasswordRepeatInput");
 const signOutButton = document.querySelector("#signOutButton");
 const signInButton = document.querySelector("#signInButton");
 const signUpButton = document.querySelector("#signUpButton");
 const resetPasswordButton = document.querySelector("#resetPasswordButton");
 const accountButton = document.querySelector("#accountButton");
+let authMode = "sign-in";
+let ignoreNextAuthToggleClick = false;
 
 document.querySelector("#menuButton").addEventListener("click", openSearchSheet);
 document.querySelector("#addCardButton").addEventListener("click", () => openCardSheet());
@@ -1681,7 +1686,7 @@ columnForm.addEventListener("submit", saveColumn);
 themeForm.addEventListener("submit", saveTheme);
 voiceForm.addEventListener("submit", saveVoiceCard);
 labelsForm.addEventListener("submit", saveLabels);
-authForm.addEventListener("submit", signInWithEmail);
+authForm.addEventListener("submit", handleAuthSubmit);
 deleteCardButton.addEventListener("click", deleteActiveCard);
 deleteColumnButton.addEventListener("click", deleteActiveColumn);
 searchInput.addEventListener("input", renderSearch);
@@ -1714,11 +1719,18 @@ voiceStatusInput.addEventListener("change", () => {
   }
 });
 document.querySelector("#resetLabelsButton").addEventListener("click", resetLabels);
-signUpButton.addEventListener("click", signUpWithEmail);
+signUpButton.addEventListener("click", () => {
+  if (ignoreNextAuthToggleClick) {
+    ignoreNextAuthToggleClick = false;
+    return;
+  }
+  toggleAuthMode();
+});
 signUpButton.addEventListener("pointerup", (event) => {
   if (event.pointerType === "touch") {
     event.preventDefault();
-    signUpWithEmail(event);
+    ignoreNextAuthToggleClick = true;
+    toggleAuthMode();
   }
 });
 resetPasswordButton.addEventListener("click", sendPasswordResetEmail);
@@ -2306,10 +2318,44 @@ function updateAuthUi(user) {
 }
 
 function openAuthSheet() {
+  setAuthMode(currentUser ? "sign-in" : authMode);
   openSheet(authSheet);
   if (!currentUser) {
     authEmailInput.focus();
   }
+}
+
+function handleAuthSubmit(event) {
+  if (authMode === "sign-up") {
+    return signUpWithEmail(event);
+  }
+  return signInWithEmail(event);
+}
+
+function toggleAuthMode() {
+  setAuthMode(authMode === "sign-in" ? "sign-up" : "sign-in");
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const isSignUp = authMode === "sign-up";
+  authTitle.textContent = isSignUp ? "Регистрация" : "Аккаунт";
+  authSheet.setAttribute("aria-label", isSignUp ? "Регистрация" : "Аккаунт");
+  authPasswordRepeatLabel.hidden = !isSignUp;
+  authPasswordRepeatInput.required = isSignUp;
+  if (!isSignUp) {
+    authPasswordRepeatInput.value = "";
+  }
+  authPasswordInput.autocomplete = isSignUp ? "new-password" : "current-password";
+  signInButton.textContent = isSignUp ? "Зарегистрироваться" : "Войти";
+  signUpButton.textContent = isSignUp ? "Войти" : "Регистрация";
+  resetPasswordButton.hidden = isSignUp;
+  signOutButton.hidden = !currentUser || isSignUp;
+  setAuthStatus(
+    isSignUp
+      ? "Создайте аккаунт через e-mail. Пароль нужно ввести дважды."
+      : "Войдите в аккаунт через e-mail и пароль.",
+  );
 }
 
 async function signInWithEmail(event) {
@@ -2354,7 +2400,7 @@ async function signUpWithEmail(event) {
     email,
     password,
     options: {
-      emailRedirectTo: window.location.origin + window.location.pathname,
+      emailRedirectTo: APP_URL,
     },
   });
   setAuthBusy(false);
@@ -2380,7 +2426,7 @@ async function sendPasswordResetEmail() {
 
   setAuthBusy(true);
   const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + window.location.pathname,
+    redirectTo: APP_URL,
   });
   setAuthBusy(false);
   if (error) {
