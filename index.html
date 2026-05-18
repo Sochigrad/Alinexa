@@ -1635,6 +1635,7 @@ let remoteSyncTimer = null;
 let remoteWorkspaceUpdatedAt = "";
 let localWorkspaceUpdatedAt = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || 0);
 let isApplyingRemoteWorkspace = false;
+let isSavingRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
 let recognition = null;
 let recognitionTarget = null;
@@ -1804,9 +1805,6 @@ document.querySelectorAll("[data-preset]").forEach((button) => {
 
 applyTheme(theme);
 render();
-if (!localWorkspaceUpdatedAt && hasLocalWorkspaceContent()) {
-  markLocalWorkspaceChanged();
-}
 initAuth();
 
 function loadBoard() {
@@ -1838,20 +1836,62 @@ function markLocalWorkspaceChanged() {
 }
 
 function hasLocalWorkspaceContent() {
-  return Boolean(localWorkspaceUpdatedAt) || hasUserBoardContent();
+  return Boolean(localWorkspaceUpdatedAt) || hasUserBoardContent(state);
 }
 
-function hasUserBoardContent() {
-  if (!state.cards.length) {
+function hasUserBoardContent(board = state) {
+  if (!board.cards?.length) {
     return false;
   }
 
-  if (state.cards.length !== defaultBoard.cards.length || state.columns.length !== defaultBoard.columns.length) {
+  if (board.cards.length !== defaultBoard.cards.length || board.columns.length !== defaultBoard.columns.length) {
     return true;
   }
 
   const defaultTitles = new Set(defaultBoard.cards.map((card) => card.title));
-  return state.cards.some((card) => !defaultTitles.has(card.title));
+  return board.cards.some((card) => !defaultTitles.has(card.title));
+}
+
+function areBoardsEqual(firstBoard, secondBoard) {
+  return JSON.stringify(normalizeBoard(firstBoard)) === JSON.stringify(normalizeBoard(secondBoard));
+}
+
+function mergeBoards(localBoard, remoteBoard) {
+  const columnMap = new Map();
+  [...remoteBoard.columns, ...localBoard.columns].forEach((column) => {
+    if (!column?.id || columnMap.has(column.id)) {
+      return;
+    }
+    columnMap.set(column.id, { ...column });
+  });
+
+  const titleToRemoteCard = new Map();
+  remoteBoard.cards.forEach((card) => {
+    titleToRemoteCard.set(normalizeMergeKey(card.title), card);
+  });
+
+  const cardMap = new Map();
+  remoteBoard.cards.forEach((card) => cardMap.set(card.id, { ...card }));
+  localBoard.cards.forEach((card) => {
+    const sameTitleRemote = titleToRemoteCard.get(normalizeMergeKey(card.title));
+    const mergeId = cardMap.has(card.id) ? card.id : sameTitleRemote?.id || card.id;
+    cardMap.set(mergeId, { ...(cardMap.get(mergeId) || {}), ...card, id: mergeId });
+  });
+
+  const columnIds = new Set(columnMap.keys());
+  const cards = [...cardMap.values()].map((card) => {
+    const columnId = columnIds.has(card.columnId) ? card.columnId : [...columnIds][0];
+    return { ...card, columnId };
+  });
+
+  return normalizeBoard({
+    columns: [...columnMap.values()],
+    cards,
+  });
+}
+
+function normalizeMergeKey(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function normalizeBoard(board) {
@@ -2496,15 +2536,13 @@ async function loadRemoteWorkspace() {
   }
 
   const remoteTime = Date.parse(data.updated_at || "") || 0;
-  if (localWorkspaceUpdatedAt > remoteTime && hasLocalWorkspaceContent()) {
-    await saveRemoteWorkspace();
-    return;
-  }
-
   remoteWorkspaceUpdatedAt = data.updated_at || "";
   isApplyingRemoteWorkspace = true;
-  if (data.board?.columns && data.board?.cards) {
-    state = normalizeBoard(data.board);
+  const localBoard = normalizeBoard(state);
+  const remoteBoard = data.board?.columns && data.board?.cards ? normalizeBoard(data.board) : null;
+  const shouldMerge = remoteBoard && hasUserBoardContent(localBoard) && !areBoardsEqual(localBoard, remoteBoard);
+  if (remoteBoard) {
+    state = shouldMerge ? mergeBoards(localBoard, remoteBoard) : remoteBoard;
     quickColumnId = state.columns[0]?.id || "";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -2526,6 +2564,9 @@ async function loadRemoteWorkspace() {
     localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
   }
   render();
+  if (shouldMerge) {
+    await saveRemoteWorkspace();
+  }
 }
 
 async function syncRemoteWorkspace() {
@@ -2544,7 +2585,7 @@ async function syncRemoteWorkspace() {
   }
 
   const remoteTime = Date.parse(data.updated_at) || 0;
-  if (remoteTime > localWorkspaceUpdatedAt) {
+  if (remoteTime > localWorkspaceUpdatedAt && !isSavingRemoteWorkspace) {
     await loadRemoteWorkspace();
   }
 }
@@ -2580,15 +2621,19 @@ async function saveRemoteWorkspace() {
     updated_at: new Date().toISOString(),
   };
 
+  isSavingRemoteWorkspace = true;
   const { error } = await supabaseClient
     .from(WORKSPACE_TABLE)
     .upsert(payload, { onConflict: "user_id" });
+  isSavingRemoteWorkspace = false;
 
   if (error) {
     setAuthStatus("Доска сохранена на этом устройстве, но облачное сохранение еще не подключено в Supabase.", "error");
     return;
   }
   remoteWorkspaceUpdatedAt = payload.updated_at;
+  localWorkspaceUpdatedAt = Date.parse(payload.updated_at) || Date.now();
+  localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
 }
 
 function openAuthSheet() {
