@@ -1630,6 +1630,13 @@ const defaultBoard = {
   ],
 };
 
+function createPrivateEmptyBoard() {
+  return {
+    columns: structuredClone(defaultBoard.columns),
+    cards: [],
+  };
+}
+
 let state = loadBoard();
 let theme = loadTheme();
 let labels = loadLabels();
@@ -1654,6 +1661,7 @@ let isApplyingRemoteWorkspace = false;
 let isSavingRemoteWorkspace = false;
 let hasLoadedRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
+let isSigningOut = false;
 let recognition = null;
 let recognitionTarget = null;
 let isRecording = false;
@@ -1813,6 +1821,11 @@ signUpButton.addEventListener("pointerup", (event) => {
 });
 resetPasswordButton.addEventListener("click", sendPasswordResetEmail);
 signOutButton.addEventListener("click", signOut);
+signOutButton.addEventListener("pointerup", (event) => {
+  if (event.pointerType === "touch") {
+    signOut(event);
+  }
+});
 document.querySelectorAll("[data-preset]").forEach((button) => {
   button.addEventListener("click", () => previewTheme(themePresets[button.dataset.preset]));
 });
@@ -3020,19 +3033,50 @@ async function sendPasswordResetEmail() {
 
 async function signOut(event) {
   event?.preventDefault();
+  if (isSigningOut) {
+    return;
+  }
   if (!ensureAuthReady()) {
     return;
   }
-  await supabaseClient.auth.signOut();
-  currentUser = null;
-  currentSession = null;
+  isSigningOut = true;
+  setAuthBusy(true);
+  try {
+    await supabaseClient.auth.signOut();
+  } finally {
+    currentUser = null;
+    currentSession = null;
+    clearPrivateWorkspaceFromThisDevice();
+    authPasswordInput.value = "";
+    authPasswordRepeatInput.value = "";
+    authForm.classList.remove("is-signed-in");
+    updateAuthUi(null);
+    setAuthMode("sign-in");
+    setAuthStatus("Вы вышли из аккаунта. Доска очищена на этом устройстве.", "success");
+    setAuthBusy(false);
+    isSigningOut = false;
+  }
+}
+
+function clearPrivateWorkspaceFromThisDevice() {
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = null;
+  stopRemoteSync();
   hasLoadedRemoteWorkspace = false;
-  authPasswordInput.value = "";
-  authPasswordRepeatInput.value = "";
-  authForm.classList.remove("is-signed-in");
-  updateAuthUi(null);
-  setAuthMode("sign-in");
-  setAuthStatus("Вы вышли из аккаунта.", "success");
+  remoteWorkspaceUpdatedAt = "";
+  localWorkspaceUpdatedAt = 0;
+  activeCardId = null;
+  activeColumnId = null;
+  quickColumnId = defaultBoard.columns[0]?.id || "";
+  state = createPrivateEmptyBoard();
+  labels = structuredClone(defaultLabels);
+  theme = { ...defaultTheme };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
+  localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+  localStorage.removeItem(LOCAL_UPDATED_KEY);
+  applyTheme(theme);
+  render();
 }
 
 function ensureAuthReady() {
