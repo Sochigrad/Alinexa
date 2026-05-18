@@ -922,7 +922,8 @@ textarea {
   gap: 10px;
 }
 
-#authForm.is-sign-up .auth-actions {
+#authForm.is-sign-up .auth-actions,
+#authForm.is-password-reset .auth-actions {
   grid-template-columns: 1fr;
 }
 
@@ -1435,12 +1436,12 @@ textarea {
           <button class="ghost-button" id="closeAuthButton" type="button">Закрыть</button>
         </div>
         <div class="auth-status" id="authStatus">Войдите или зарегистрируйтесь через e-mail.</div>
-        <label>
-          E-mail
+        <label id="authEmailLabel">
+          <span>E-mail</span>
           <input id="authEmailInput" type="email" autocomplete="email" required />
         </label>
-        <label>
-          Пароль
+        <label id="authPasswordLabel">
+          <span id="authPasswordText">Пароль</span>
           <input id="authPasswordInput" type="password" autocomplete="current-password" minlength="8" />
         </label>
         <label id="authPasswordRepeatLabel" hidden>
@@ -1663,7 +1664,9 @@ const authSheet = document.querySelector("#authSheet");
 const authForm = document.querySelector("#authForm");
 const authTitle = document.querySelector("#authTitle");
 const authStatus = document.querySelector("#authStatus");
+const authEmailLabel = document.querySelector("#authEmailLabel");
 const authEmailInput = document.querySelector("#authEmailInput");
+const authPasswordText = document.querySelector("#authPasswordText");
 const authPasswordInput = document.querySelector("#authPasswordInput");
 const authPasswordRepeatLabel = document.querySelector("#authPasswordRepeatLabel");
 const authPasswordRepeatInput = document.querySelector("#authPasswordRepeatInput");
@@ -2316,9 +2319,21 @@ async function initAuth() {
     await loadRemoteWorkspace();
   }
 
+  if (currentUser && hasPasswordRecoveryUrl()) {
+    setAuthMode("password-reset");
+    openSheet(authSheet);
+    setAuthStatus("Введите новый пароль и повторите его.", "success");
+  }
+
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
     currentUser = session?.user || null;
     updateAuthUi(currentUser);
+    if (event === "PASSWORD_RECOVERY") {
+      setAuthMode("password-reset");
+      openSheet(authSheet);
+      setAuthStatus("Введите новый пароль и повторите его.", "success");
+      return;
+    }
     if (currentUser && event === "SIGNED_IN") {
       await loadRemoteWorkspace();
     }
@@ -2341,10 +2356,12 @@ function getSupabaseClient() {
 function updateAuthUi(user) {
   accountButton.textContent = user?.email ? user.email.slice(0, 2).toUpperCase() : "IN";
   accountButton.setAttribute("aria-label", user?.email ? `Аккаунт ${user.email}` : "Войти в аккаунт");
-  signOutButton.hidden = !user || authMode === "sign-up";
+  signOutButton.hidden = !user || authMode === "sign-up" || authMode === "password-reset";
   if (user) {
     authEmailInput.value = user.email || "";
-    setAuthStatus(`Вы вошли как ${user.email}.`, "success");
+    if (authMode !== "password-reset") {
+      setAuthStatus(`Вы вошли как ${user.email}.`, "success");
+    }
   }
 }
 
@@ -2433,6 +2450,9 @@ function handleAuthSubmit(event) {
   if (authMode === "sign-up") {
     return signUpWithEmail(event);
   }
+  if (authMode === "password-reset") {
+    return saveNewPassword(event);
+  }
   return signInWithEmail(event);
 }
 
@@ -2443,22 +2463,29 @@ function toggleAuthMode() {
 function setAuthMode(mode) {
   authMode = mode;
   const isSignUp = authMode === "sign-up";
+  const isPasswordReset = authMode === "password-reset";
   authForm.classList.toggle("is-sign-up", isSignUp);
-  authTitle.textContent = isSignUp ? "Регистрация" : "Аккаунт";
-  authSheet.setAttribute("aria-label", isSignUp ? "Регистрация" : "Аккаунт");
-  authPasswordRepeatLabel.hidden = !isSignUp;
-  authPasswordRepeatInput.required = isSignUp;
-  if (!isSignUp) {
+  authForm.classList.toggle("is-password-reset", isPasswordReset);
+  authTitle.textContent = isPasswordReset ? "Новый пароль" : isSignUp ? "Регистрация" : "Аккаунт";
+  authSheet.setAttribute("aria-label", authTitle.textContent);
+  authEmailLabel.hidden = isPasswordReset;
+  authEmailInput.required = !isPasswordReset;
+  authPasswordText.textContent = isPasswordReset ? "Новый пароль" : "Пароль";
+  authPasswordRepeatLabel.hidden = !isSignUp && !isPasswordReset;
+  authPasswordRepeatInput.required = isSignUp || isPasswordReset;
+  if (!isSignUp && !isPasswordReset) {
     authPasswordRepeatInput.value = "";
   }
-  authPasswordInput.autocomplete = isSignUp ? "new-password" : "current-password";
-  signInButton.textContent = isSignUp ? "Зарегистрироваться" : "Войти";
+  authPasswordInput.autocomplete = isSignUp || isPasswordReset ? "new-password" : "current-password";
+  signInButton.textContent = isPasswordReset ? "Сохранить пароль" : isSignUp ? "Зарегистрироваться" : "Войти";
   signUpButton.textContent = "Регистрация";
-  signUpButton.hidden = isSignUp;
-  resetPasswordButton.hidden = isSignUp;
-  signOutButton.hidden = !currentUser || isSignUp;
+  signUpButton.hidden = isSignUp || isPasswordReset;
+  resetPasswordButton.hidden = isSignUp || isPasswordReset;
+  signOutButton.hidden = !currentUser || isSignUp || isPasswordReset;
   setAuthStatus(
-    isSignUp
+    isPasswordReset
+      ? "Введите новый пароль и повторите его."
+      : isSignUp
       ? "Создайте аккаунт через e-mail. Пароль нужно ввести дважды."
       : "Войдите в аккаунт через e-mail и пароль.",
   );
@@ -2575,6 +2602,37 @@ function isExistingUserSignup(data) {
     return false;
   }
   return Array.isArray(user.identities) && user.identities.length === 0;
+}
+
+async function saveNewPassword(event) {
+  event.preventDefault();
+  if (!ensureAuthReady()) {
+    return;
+  }
+
+  const password = authPasswordInput.value;
+  const passwordRepeat = authPasswordRepeatInput.value;
+  if (!validateRepeatedPassword(password, passwordRepeat) || !validateAuthFields("reset@alinexa.ru", password)) {
+    return;
+  }
+
+  setAuthBusy(true);
+  const { error } = await supabaseClient.auth.updateUser({ password });
+  setAuthBusy(false);
+  if (error) {
+    setAuthStatus(`Пароль не сохранен: ${translateAuthError(error.message)}`, "error");
+    return;
+  }
+
+  authPasswordInput.value = "";
+  authPasswordRepeatInput.value = "";
+  setAuthMode("sign-in");
+  setAuthStatus("Пароль обновлен. Теперь можно входить с новым паролем.", "success");
+}
+
+function hasPasswordRecoveryUrl() {
+  const value = `${window.location.hash || ""}${window.location.search || ""}`;
+  return /type=recovery|recovery/i.test(value);
 }
 
 async function sendPasswordResetEmail() {
