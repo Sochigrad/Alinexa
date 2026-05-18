@@ -1659,6 +1659,7 @@ let remoteWorkspaceUpdatedAt = "";
 let localWorkspaceUpdatedAt = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || 0);
 let isApplyingRemoteWorkspace = false;
 let isSavingRemoteWorkspace = false;
+let hasUnsavedLocalChanges = false;
 let hasLoadedRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
 let isSigningOut = false;
@@ -1854,9 +1855,14 @@ function loadBoard() {
   }
 }
 
-function persist() {
+function persist({ immediate = false } = {}) {
   markLocalWorkspaceChanged();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  hasUnsavedLocalChanges = true;
+  if (immediate) {
+    void saveRemoteWorkspace();
+    return;
+  }
   queueRemoteWorkspaceSave();
 }
 
@@ -2265,7 +2271,7 @@ function finishTouchDrag(event) {
   if (overColumnId) {
     moveCardToPosition(cardId, overColumnId, overIndex);
     quickColumnId = overColumnId;
-    persist();
+    persist({ immediate: true });
     render();
   }
 }
@@ -2602,6 +2608,9 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
     localWorkspaceUpdatedAt = remoteTime;
     localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
   }
+  if (!shouldMerge) {
+    hasUnsavedLocalChanges = false;
+  }
   render();
   if (shouldMerge) {
     await saveRemoteWorkspace();
@@ -2610,6 +2619,11 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
 
 async function syncRemoteWorkspace() {
   if (!supabaseClient || !currentUser) {
+    return;
+  }
+
+  if (hasUnsavedLocalChanges) {
+    await saveRemoteWorkspace();
     return;
   }
 
@@ -2709,16 +2723,19 @@ async function upsertRemoteWorkspace(payload) {
 }
 
 async function saveRemoteWorkspace() {
-  if (!supabaseClient || !currentUser) {
+  if (!supabaseClient || !currentUser || isSavingRemoteWorkspace) {
     return;
   }
 
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = null;
+  const saveStartedAt = localWorkspaceUpdatedAt || Date.now();
   const payload = {
     user_id: currentUser.id,
     board: normalizeBoard(state),
     theme,
     labels,
-    updated_at: new Date().toISOString(),
+    updated_at: new Date(saveStartedAt).toISOString(),
   };
 
   isSavingRemoteWorkspace = true;
@@ -2732,6 +2749,9 @@ async function saveRemoteWorkspace() {
   remoteWorkspaceUpdatedAt = data?.updated_at || payload.updated_at;
   localWorkspaceUpdatedAt = Date.parse(remoteWorkspaceUpdatedAt) || Date.now();
   localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
+  if (localWorkspaceUpdatedAt === saveStartedAt) {
+    hasUnsavedLocalChanges = false;
+  }
 }
 
 function openAuthSheet() {
@@ -3735,7 +3755,7 @@ function onDrop(event) {
 
   moveCardToPosition(cardId, columnId, dropIndex);
   quickColumnId = columnId;
-  persist();
+  persist({ immediate: true });
   render();
 }
 
