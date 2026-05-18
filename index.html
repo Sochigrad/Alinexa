@@ -96,6 +96,15 @@ body.is-authenticated .welcome-screen {
   display: none;
 }
 
+body:not(.is-authenticated) #menuButton,
+body:not(.is-authenticated) #accountButton {
+  display: none;
+}
+
+body:not(.is-authenticated) .topbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .topbar {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 44px;
