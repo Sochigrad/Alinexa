@@ -88,7 +88,7 @@ button {
 
 .topbar {
   display: grid;
-  grid-template-columns: 44px 1fr 44px 44px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   gap: 8px;
   align-items: center;
   padding: 14px 14px 8px;
@@ -113,6 +113,21 @@ button {
   font-size: 26px;
   font-weight: 950;
   line-height: 1.15;
+}
+
+.account-name {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, white);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .icon-button,
@@ -1191,9 +1206,9 @@ textarea {
         <div class="brand">
           <p>Мобильная доска</p>
           <h1 id="boardTitle">Alinexa</h1>
+          <span class="account-name" id="accountName" hidden></span>
         </div>
         <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт">IN</button>
-        <button class="avatar-button" id="clearButton" type="button" aria-label="Сбросить доску">AX</button>
       </header>
 
       <section class="board-meta" aria-label="Статистика доски">
@@ -1718,6 +1733,7 @@ const signInButton = document.querySelector("#signInButton");
 const signUpButton = document.querySelector("#signUpButton");
 const resetPasswordButton = document.querySelector("#resetPasswordButton");
 const accountButton = document.querySelector("#accountButton");
+const accountName = document.querySelector("#accountName");
 let authMode = "sign-in";
 let ignoreNextAuthToggleClick = false;
 
@@ -1734,7 +1750,6 @@ document.querySelector("#closeThemeButton").addEventListener("click", closeSheet
 document.querySelector("#closeVoiceButton").addEventListener("click", closeSheets);
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
 document.querySelector("#closeAuthButton").addEventListener("click", closeSheets);
-document.querySelector("#clearButton").addEventListener("click", resetBoard);
 accountButton.addEventListener("click", openAuthSheet);
 scrimEl.addEventListener("click", closeSheets);
 
@@ -2496,6 +2511,10 @@ function updateAuthUi(user) {
   const displayName = getUserDisplayName(user);
   accountButton.textContent = user ? getUserInitials(user) : "IN";
   accountButton.setAttribute("aria-label", user ? `Кабинет ${displayName}` : "Войти в аккаунт");
+  if (accountName) {
+    accountName.hidden = !user;
+    accountName.textContent = user ? displayName : "";
+  }
   signOutButton.hidden = !user || authMode === "sign-up" || authMode === "password-reset";
   if (user) {
     authEmailInput.value = user.email || "";
@@ -2999,7 +3018,8 @@ async function sendPasswordResetEmail() {
   setAuthStatus("Письмо для восстановления пароля отправлено.", "success");
 }
 
-async function signOut() {
+async function signOut(event) {
+  event?.preventDefault();
   if (!ensureAuthReady()) {
     return;
   }
