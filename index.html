@@ -1307,10 +1307,10 @@ textarea {
       <section class="welcome-screen" id="welcomeScreen" aria-label="Старт Alinexa">
         <div class="welcome-copy">
           <p class="welcome-kicker">Мобильная доска Alinexa</p>
-          <h2>Задачи, идеи и дела — в одном аккуратном месте</h2>
+          <h2>Задачи, идеи и&nbsp;дела — в&nbsp;одном аккуратном месте</h2>
           <p>
-            Записывайте мысли голосом, раскладывайте карточки по колонкам, отмечайте важное на сегодня
-            и возвращайтесь к своей доске с телефона или компьютера.
+            Записывайте мысли голосом, раскладывайте карточки по&nbsp;колонкам, отмечайте важное
+            на&nbsp;сегодня и&nbsp;возвращайтесь к&nbsp;своей доске с&nbsp;телефона или&nbsp;компьютера.
           </p>
         </div>
         <div class="welcome-actions">
@@ -2585,14 +2585,14 @@ async function initAuth() {
       isWaitingForPasswordRecovery = false;
       setAuthMode("password-reset");
       openSheet(authSheet);
-      setAuthStatus("Введите новый пароль и повторите его.", "success");
+      setAuthStatus("Введите\u00a0новый пароль и\u00a0повторите его.", "success");
       return;
     }
     if (event === "SIGNED_IN" && (isWaitingForPasswordRecovery || hasPasswordRecoveryUrl())) {
       isWaitingForPasswordRecovery = false;
       setAuthMode("password-reset");
       openSheet(authSheet);
-      setAuthStatus("Введите новый пароль и повторите его.", "success");
+      setAuthStatus("Введите\u00a0новый пароль и\u00a0повторите его.", "success");
       return;
     }
     if (currentUser && event === "SIGNED_IN") {
@@ -2620,7 +2620,7 @@ async function initAuth() {
     isWaitingForPasswordRecovery = false;
     setAuthMode("password-reset");
     openSheet(authSheet);
-    setAuthStatus("Введите новый пароль и повторите его.", "success");
+    setAuthStatus("Введите\u00a0новый пароль и\u00a0повторите его.", "success");
   }
 }
 
@@ -2930,12 +2930,12 @@ function setAuthMode(mode) {
   signOutButton.hidden = !currentUser || isSignUp || isPasswordReset;
   setAuthStatus(
     isPasswordReset
-      ? "Введите новый пароль и повторите его."
+      ? "Введите\u00a0новый пароль и\u00a0повторите его."
       : isSignUp
-      ? "Создайте аккаунт: e-mail, логин, имя, фамилия и пароль дважды."
+      ? "Создайте аккаунт: e-mail, логин, имя, фамилия и\u00a0пароль дважды."
       : isSignedIn
       ? `Кабинет: ${getUserDisplayName(currentUser)}. E-mail: ${currentUser.email}.`
-      : "Войдите в аккаунт через e-mail и пароль.",
+      : "Войдите в\u00a0аккаунт через e-mail и\u00a0пароль.",
     isSignedIn ? "success" : "",
   );
 }
