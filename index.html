@@ -2584,8 +2584,7 @@ async function syncRemoteWorkspace() {
     return;
   }
 
-  const remoteTime = Date.parse(data.updated_at) || 0;
-  if (remoteTime > localWorkspaceUpdatedAt && !isSavingRemoteWorkspace) {
+  if (!isSavingRemoteWorkspace) {
     await loadRemoteWorkspace();
   }
 }
