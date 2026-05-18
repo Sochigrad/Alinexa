@@ -1631,6 +1631,7 @@ let supabaseClient = null;
 let currentUser = null;
 let remoteSaveTimer = null;
 let isApplyingRemoteWorkspace = false;
+let isWaitingForPasswordRecovery = false;
 let recognition = null;
 let recognitionTarget = null;
 let isRecording = false;
@@ -2351,6 +2352,14 @@ async function initAuth() {
     currentUser = session?.user || null;
     updateAuthUi(currentUser);
     if (event === "PASSWORD_RECOVERY") {
+      isWaitingForPasswordRecovery = false;
+      setAuthMode("password-reset");
+      openSheet(authSheet);
+      setAuthStatus("Введите новый пароль и повторите его.", "success");
+      return;
+    }
+    if (event === "SIGNED_IN" && (isWaitingForPasswordRecovery || hasPasswordRecoveryUrl())) {
+      isWaitingForPasswordRecovery = false;
       setAuthMode("password-reset");
       openSheet(authSheet);
       setAuthStatus("Введите новый пароль и повторите его.", "success");
@@ -2369,6 +2378,7 @@ async function initAuth() {
   }
 
   if (currentUser && hasPasswordRecoveryUrl()) {
+    isWaitingForPasswordRecovery = false;
     setAuthMode("password-reset");
     openSheet(authSheet);
     setAuthStatus("Введите новый пароль и повторите его.", "success");
@@ -2738,13 +2748,26 @@ async function saveNewPassword(event) {
 
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
+  clearPasswordRecoveryMarker();
   setAuthMode("sign-in");
   setAuthStatus("Пароль обновлен. Теперь можно входить с новым паролем.", "success");
 }
 
 function hasPasswordRecoveryUrl() {
   const value = `${window.location.hash || ""}${window.location.search || ""}`;
-  return /type=recovery|recovery/i.test(value);
+  const isRecoveryLink = /type=recovery|auth=recovery|recovery/i.test(value);
+  const hasAuthCode = /(?:[?#&])code=/.test(value);
+  return isRecoveryLink || (hasAuthCode && sessionStorage.getItem("alinexa-password-recovery") === "1");
+}
+
+function markPasswordRecoveryRequest() {
+  sessionStorage.setItem("alinexa-password-recovery", "1");
+  isWaitingForPasswordRecovery = true;
+}
+
+function clearPasswordRecoveryMarker() {
+  sessionStorage.removeItem("alinexa-password-recovery");
+  isWaitingForPasswordRecovery = false;
 }
 
 async function sendPasswordResetEmail() {
@@ -2759,11 +2782,13 @@ async function sendPasswordResetEmail() {
   }
 
   setAuthBusy(true);
+  markPasswordRecoveryRequest();
   const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: APP_URL,
+    redirectTo: `${APP_URL}?auth=recovery`,
   });
   setAuthBusy(false);
   if (error) {
+    clearPasswordRecoveryMarker();
     setAuthStatus(error.message, "error");
     return;
   }
