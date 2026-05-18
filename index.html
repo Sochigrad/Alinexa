@@ -1307,7 +1307,7 @@ textarea {
       <section class="welcome-screen" id="welcomeScreen" aria-label="Старт Alinexa">
         <div class="welcome-copy">
           <p class="welcome-kicker">Мобильная доска Alinexa</p>
-          <h2>Задачи, идеи и дела — в одном аккуратном месте.</h2>
+          <h2>Задачи, идеи и дела — в одном аккуратном месте</h2>
           <p>
             Записывайте мысли голосом, раскладывайте карточки по колонкам, отмечайте важное на сегодня
             и возвращайтесь к своей доске с телефона или компьютера.
@@ -3118,6 +3118,15 @@ async function saveNewPassword(event) {
   }
 
   setAuthBusy(true);
+  const hasRecoverySession = await ensurePasswordRecoverySession();
+  if (!hasRecoverySession) {
+    setAuthBusy(false);
+    setAuthStatus(
+      "Пароль не сохранен: ссылка восстановления устарела или открылась не полностью. Нажмите «Сброс пароля» еще раз и откройте новое письмо.",
+      "error",
+    );
+    return;
+  }
   const { error } = await supabaseClient.auth.updateUser({ password });
   setAuthBusy(false);
   if (error) {
@@ -3130,6 +3139,50 @@ async function saveNewPassword(event) {
   clearPasswordRecoveryMarker();
   setAuthMode("sign-in");
   setAuthStatus("Пароль обновлен. Теперь можно входить с новым паролем.", "success");
+}
+
+async function ensurePasswordRecoverySession() {
+  const { data } = await supabaseClient.auth.getSession();
+  if (data?.session) {
+    currentSession = data.session;
+    currentUser = data.session.user || null;
+    return true;
+  }
+
+  const recoveryParams = getRecoveryUrlParams();
+  const accessToken = recoveryParams.get("access_token");
+  const refreshToken = recoveryParams.get("refresh_token");
+  if (accessToken && refreshToken) {
+    const { data: sessionData, error } = await supabaseClient.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (!error && sessionData?.session) {
+      currentSession = sessionData.session;
+      currentUser = sessionData.session.user || null;
+      return true;
+    }
+  }
+
+  const code = recoveryParams.get("code");
+  if (code && supabaseClient.auth.exchangeCodeForSession) {
+    const { data: sessionData, error } = await supabaseClient.auth.exchangeCodeForSession(code);
+    if (!error && sessionData?.session) {
+      currentSession = sessionData.session;
+      currentUser = sessionData.session.user || null;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getRecoveryUrlParams() {
+  const params = new URLSearchParams(window.location.search || "");
+  const hash = (window.location.hash || "").replace(/^#/, "");
+  const hashParams = new URLSearchParams(hash);
+  hashParams.forEach((value, key) => params.set(key, value));
+  return params;
 }
 
 function hasPasswordRecoveryUrl() {
