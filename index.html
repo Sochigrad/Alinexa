@@ -2581,7 +2581,7 @@ async function signInWithEmail(event) {
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   setAuthBusy(false);
   if (error) {
-    setAuthStatus("Войти не получилось. Если аккаунта еще нет, нажмите «Регистрация».", "error");
+    setAuthStatus(`Войти не получилось: ${translateAuthError(error.message)}`, "error");
     return;
   }
   authPasswordInput.value = "";
@@ -2874,6 +2874,15 @@ function translateAuthError(message) {
   }
   if (/already registered|already been registered|User already/i.test(message)) {
     return "этот e-mail уже зарегистрирован. Попробуйте войти или сбросить пароль.";
+  }
+  if (/invalid login credentials|invalid credentials|invalid_grant/i.test(message)) {
+    return "неверный e-mail или пароль. Если аккаунт уже создан, проверьте пароль или нажмите «Сброс пароля».";
+  }
+  if (/email not confirmed|not confirmed|confirm/i.test(message)) {
+    return "почта еще не подтверждена. Откройте письмо Alinexa и нажмите ссылку подтверждения.";
+  }
+  if (/user not found|no user/i.test(message)) {
+    return "аккаунт с таким e-mail не найден. Сначала пройдите регистрацию.";
   }
   if (/invalid email/i.test(message)) {
     return "некорректный e-mail.";
