@@ -1860,8 +1860,7 @@ function persist({ immediate = false } = {}) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   hasUnsavedLocalChanges = true;
   if (immediate) {
-    void saveRemoteWorkspace();
-    return;
+    return saveRemoteWorkspace();
   }
   queueRemoteWorkspaceSave();
 }
@@ -2582,6 +2581,11 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
 
   const remoteTime = Date.parse(data.updated_at || "") || 0;
   remoteWorkspaceUpdatedAt = data.updated_at || "";
+  const localTime = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || localWorkspaceUpdatedAt || 0);
+  if (mergeLocalData && localTime > remoteTime) {
+    await saveRemoteWorkspace();
+    return;
+  }
   isApplyingRemoteWorkspace = true;
   const localBoard = normalizeBoard(state);
   const remoteBoard = data.board?.columns && data.board?.cards ? normalizeBoard(data.board) : null;
@@ -3353,14 +3357,16 @@ function deleteActiveColumn() {
   closeSheets();
 }
 
-function deleteActiveCard() {
+async function deleteActiveCard(event) {
+  event?.preventDefault();
   if (!activeCardId) {
     return;
   }
   state.cards = state.cards.filter((card) => card.id !== activeCardId);
-  persist();
+  const savePromise = persist({ immediate: true });
   render();
   closeSheets();
+  await savePromise;
 }
 
 function saveVoiceCard(event) {
