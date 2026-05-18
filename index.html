@@ -1636,6 +1636,7 @@ let remoteWorkspaceUpdatedAt = "";
 let localWorkspaceUpdatedAt = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || 0);
 let isApplyingRemoteWorkspace = false;
 let isSavingRemoteWorkspace = false;
+let hasLoadedRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
 let recognition = null;
 let recognitionTarget = null;
@@ -2448,10 +2449,12 @@ async function initAuth() {
       return;
     }
     if (currentUser && event === "SIGNED_IN") {
-      await loadRemoteWorkspace();
+      await loadRemoteWorkspace({ mergeLocalData: !hasLoadedRemoteWorkspace });
+      hasLoadedRemoteWorkspace = true;
       startRemoteSync();
     }
     if (!currentUser && event === "SIGNED_OUT") {
+      hasLoadedRemoteWorkspace = false;
       stopRemoteSync();
     }
   });
@@ -2460,7 +2463,8 @@ async function initAuth() {
   currentUser = data.session?.user || null;
   updateAuthUi(currentUser);
   if (currentUser) {
-    await loadRemoteWorkspace();
+    await loadRemoteWorkspace({ mergeLocalData: !hasLoadedRemoteWorkspace });
+    hasLoadedRemoteWorkspace = true;
     startRemoteSync();
   }
 
@@ -2516,7 +2520,7 @@ function getUserInitials(user) {
   return (meta.login || user?.email || "IN").slice(0, 2).toUpperCase();
 }
 
-async function loadRemoteWorkspace() {
+async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   if (!supabaseClient || !currentUser) {
     return;
   }
@@ -2542,9 +2546,11 @@ async function loadRemoteWorkspace() {
   const remoteTime = Date.parse(data.updated_at || "") || 0;
   remoteWorkspaceUpdatedAt = data.updated_at || "";
   isApplyingRemoteWorkspace = true;
+  const localBoard = normalizeBoard(state);
   const remoteBoard = data.board?.columns && data.board?.cards ? normalizeBoard(data.board) : null;
+  const shouldMerge = mergeLocalData && remoteBoard && hasUserBoardContent(localBoard) && !areBoardsEqual(localBoard, remoteBoard);
   if (remoteBoard) {
-    state = remoteBoard;
+    state = shouldMerge ? mergeBoards(localBoard, remoteBoard) : remoteBoard;
     quickColumnId = state.columns[0]?.id || "";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -2566,6 +2572,9 @@ async function loadRemoteWorkspace() {
     localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
   }
   render();
+  if (shouldMerge) {
+    await saveRemoteWorkspace();
+  }
 }
 
 async function syncRemoteWorkspace() {
@@ -2584,7 +2593,7 @@ async function syncRemoteWorkspace() {
   }
 
   if (!isSavingRemoteWorkspace) {
-    await loadRemoteWorkspace();
+    await loadRemoteWorkspace({ mergeLocalData: false });
   }
 }
 
