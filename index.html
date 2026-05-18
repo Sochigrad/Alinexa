@@ -86,6 +86,16 @@ button {
   overflow: visible;
 }
 
+body:not(.is-authenticated) .board-meta,
+body:not(.is-authenticated) .board,
+body:not(.is-authenticated) .bottom-bar {
+  display: none;
+}
+
+body.is-authenticated .welcome-screen {
+  display: none;
+}
+
 .topbar {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) 44px;
@@ -153,6 +163,73 @@ button {
 .avatar-button {
   font-size: 12px;
   font-weight: 900;
+}
+
+.welcome-screen {
+  display: grid;
+  align-content: center;
+  gap: 22px;
+  min-height: calc(100svh - 86px);
+  padding: 28px 14px calc(36px + var(--safe-bottom));
+}
+
+.welcome-copy {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+}
+
+.welcome-kicker {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.welcome-copy h2 {
+  margin: 0;
+  max-width: 720px;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1.04;
+}
+
+.welcome-copy p:not(.welcome-kicker) {
+  margin: 0;
+  max-width: 620px;
+  color: color-mix(in srgb, var(--ink) 72%, var(--muted));
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.welcome-actions {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 380px);
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 52px;
+  border-radius: 8px;
+  padding: 0 18px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.primary-button {
+  border: 1px solid color-mix(in srgb, var(--accent) 92%, black);
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.secondary-button {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  color: var(--ink);
 }
 
 .board-meta {
@@ -1024,6 +1101,20 @@ textarea {
     padding-top: 24px;
   }
 
+  .welcome-screen {
+    min-height: calc(100svh - 112px);
+    padding: 56px 18px 120px;
+  }
+
+  .welcome-copy h2 {
+    font-size: 52px;
+  }
+
+  .welcome-actions {
+    grid-template-columns: 1fr 1fr;
+    width: min(100%, 560px);
+  }
+
   .board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-columns: initial;
@@ -1210,6 +1301,21 @@ textarea {
         </div>
         <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт">IN</button>
       </header>
+
+      <section class="welcome-screen" id="welcomeScreen" aria-label="Старт Alinexa">
+        <div class="welcome-copy">
+          <p class="welcome-kicker">Мобильная доска Alinexa</p>
+          <h2>Задачи, идеи и дела — в одном аккуратном месте.</h2>
+          <p>
+            Записывайте мысли голосом, раскладывайте карточки по колонкам, отмечайте важное на сегодня
+            и возвращайтесь к своей доске с телефона или компьютера.
+          </p>
+        </div>
+        <div class="welcome-actions">
+          <button class="primary-button" id="welcomeSignUpButton" type="button">Зарегистрироваться</button>
+          <button class="secondary-button" id="welcomeSignInButton" type="button">У меня уже есть аккаунт</button>
+        </div>
+      </section>
 
       <section class="board-meta" aria-label="Статистика доски">
         <div>
@@ -1743,6 +1849,8 @@ const signUpButton = document.querySelector("#signUpButton");
 const resetPasswordButton = document.querySelector("#resetPasswordButton");
 const accountButton = document.querySelector("#accountButton");
 const accountName = document.querySelector("#accountName");
+const welcomeSignUpButton = document.querySelector("#welcomeSignUpButton");
+const welcomeSignInButton = document.querySelector("#welcomeSignInButton");
 let authMode = "sign-in";
 let ignoreNextAuthToggleClick = false;
 
@@ -1760,6 +1868,8 @@ document.querySelector("#closeVoiceButton").addEventListener("click", closeSheet
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
 document.querySelector("#closeAuthButton").addEventListener("click", closeSheets);
 accountButton.addEventListener("click", openAuthSheet);
+welcomeSignUpButton?.addEventListener("click", openRegistrationSheet);
+welcomeSignInButton?.addEventListener("click", openAuthSheet);
 scrimEl.addEventListener("click", closeSheets);
 
 cardForm.addEventListener("submit", saveCard);
@@ -2527,6 +2637,7 @@ function getSupabaseClient() {
 
 function updateAuthUi(user) {
   const displayName = getUserDisplayName(user);
+  document.body.classList.toggle("is-authenticated", Boolean(user));
   accountButton.textContent = user ? getUserInitials(user) : "IN";
   accountButton.setAttribute("aria-label", user ? `Кабинет ${displayName}` : "Войти в аккаунт");
   if (accountName) {
@@ -2764,6 +2875,12 @@ function openAuthSheet() {
   if (!currentUser) {
     authEmailInput.focus();
   }
+}
+
+function openRegistrationSheet() {
+  setAuthMode("sign-up");
+  openSheet(authSheet);
+  authEmailInput.focus();
 }
 
 function handleAuthSubmit(event) {
