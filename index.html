@@ -2052,7 +2052,7 @@ function createCardElement(card) {
   const button = document.createElement("button");
   button.className = "task-card";
   button.type = "button";
-  button.draggable = !window.matchMedia("(pointer: coarse)").matches;
+  button.draggable = false;
   button.dataset.cardId = card.id;
   const status = card.status || (card.focus ? "today" : "planned");
   button.classList.add(`status-${status}`);
@@ -2095,11 +2095,13 @@ function createCardElement(card) {
 }
 
 function prepareTouchDrag(event, cardEl, cardId) {
-  if (event.pointerType === "mouse") {
+  if (event.pointerType === "mouse" && event.button !== 0) {
     return;
   }
 
-  event.preventDefault();
+  if (event.pointerType !== "mouse") {
+    event.preventDefault();
+  }
   clearTimeout(longPressTimer);
   const rect = cardEl.getBoundingClientRect();
   pendingTouch = {
@@ -2119,9 +2121,11 @@ function prepareTouchDrag(event, cardEl, cardId) {
     // Pointer capture is best effort on mobile browsers.
   }
 
-  longPressTimer = setTimeout(() => {
-    startTouchDrag(event);
-  }, 70);
+  if (event.pointerType !== "mouse") {
+    longPressTimer = setTimeout(() => {
+      startTouchDrag(event);
+    }, 70);
+  }
 }
 
 function moveTouchDrag(event) {
@@ -2538,11 +2542,9 @@ async function loadRemoteWorkspace() {
   const remoteTime = Date.parse(data.updated_at || "") || 0;
   remoteWorkspaceUpdatedAt = data.updated_at || "";
   isApplyingRemoteWorkspace = true;
-  const localBoard = normalizeBoard(state);
   const remoteBoard = data.board?.columns && data.board?.cards ? normalizeBoard(data.board) : null;
-  const shouldMerge = remoteBoard && hasUserBoardContent(localBoard) && !areBoardsEqual(localBoard, remoteBoard);
   if (remoteBoard) {
-    state = shouldMerge ? mergeBoards(localBoard, remoteBoard) : remoteBoard;
+    state = remoteBoard;
     quickColumnId = state.columns[0]?.id || "";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -2564,9 +2566,6 @@ async function loadRemoteWorkspace() {
     localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
   }
   render();
-  if (shouldMerge) {
-    await saveRemoteWorkspace();
-  }
 }
 
 async function syncRemoteWorkspace() {
