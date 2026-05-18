@@ -1461,6 +1461,7 @@ textarea {
 const STORAGE_KEY = "taskflow-board-v1";
 const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
+const WORKSPACE_TABLE = "alinexa_workspaces";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -1597,6 +1598,8 @@ let autoScrollState = { horizontal: 0, vertical: 0, list: null };
 let dragFrame = null;
 let supabaseClient = null;
 let currentUser = null;
+let remoteSaveTimer = null;
+let isApplyingRemoteWorkspace = false;
 let recognition = null;
 let recognitionTarget = null;
 let isRecording = false;
@@ -1773,6 +1776,7 @@ function loadBoard() {
 
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  queueRemoteWorkspaceSave();
 }
 
 function normalizeBoard(board) {
@@ -1809,6 +1813,17 @@ function loadTheme() {
   }
 }
 
+function normalizeTheme(value) {
+  return {
+    accent: normalizeHex(value?.accent, defaultTheme.accent),
+    bg: normalizeHex(value?.bg, defaultTheme.bg),
+    panel: normalizeHex(value?.panel, defaultTheme.panel),
+    ink: normalizeHex(value?.ink, defaultTheme.ink),
+    background: normalizeBackgroundId(value?.background, defaultTheme.background),
+    customBackground: typeof value?.customBackground === "string" ? value.customBackground : "",
+  };
+}
+
 function loadLabels() {
   const saved = localStorage.getItem(LABELS_KEY);
   if (!saved) {
@@ -1836,10 +1851,12 @@ function loadLabels() {
 
 function persistTheme() {
   localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+  queueRemoteWorkspaceSave();
 }
 
 function persistLabels() {
   localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
+  queueRemoteWorkspaceSave();
 }
 
 function applyTheme(nextTheme) {
@@ -2295,10 +2312,16 @@ async function initAuth() {
   const { data } = await supabaseClient.auth.getSession();
   currentUser = data.session?.user || null;
   updateAuthUi(currentUser);
+  if (currentUser) {
+    await loadRemoteWorkspace();
+  }
 
-  supabaseClient.auth.onAuthStateChange((_event, session) => {
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
     currentUser = session?.user || null;
     updateAuthUi(currentUser);
+    if (currentUser && event === "SIGNED_IN") {
+      await loadRemoteWorkspace();
+    }
   });
 }
 
@@ -2322,6 +2345,79 @@ function updateAuthUi(user) {
   if (user) {
     authEmailInput.value = user.email || "";
     setAuthStatus(`Вы вошли как ${user.email}.`, "success");
+  }
+}
+
+async function loadRemoteWorkspace() {
+  if (!supabaseClient || !currentUser) {
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from(WORKSPACE_TABLE)
+    .select("board, theme, labels")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (error) {
+    setAuthStatus("Вход выполнен. Чтобы доска сохранялась между устройствами, создайте таблицу данных в Supabase.", "error");
+    return;
+  }
+
+  if (!data) {
+    await saveRemoteWorkspace();
+    return;
+  }
+
+  isApplyingRemoteWorkspace = true;
+  if (data.board?.columns && data.board?.cards) {
+    state = normalizeBoard(data.board);
+    quickColumnId = state.columns[0]?.id || "";
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  if (data.theme) {
+    theme = normalizeTheme(data.theme);
+    localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+    applyTheme(theme);
+  }
+  if (Array.isArray(data.labels)) {
+    labels = data.labels.map((label, index) => normalizeLabelObject(label, index)).filter(Boolean);
+    if (!labels.length) {
+      labels = structuredClone(defaultLabels);
+    }
+    localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
+  }
+  isApplyingRemoteWorkspace = false;
+  render();
+}
+
+function queueRemoteWorkspaceSave() {
+  if (isApplyingRemoteWorkspace || !supabaseClient || !currentUser) {
+    return;
+  }
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = setTimeout(saveRemoteWorkspace, 450);
+}
+
+async function saveRemoteWorkspace() {
+  if (!supabaseClient || !currentUser) {
+    return;
+  }
+
+  const payload = {
+    user_id: currentUser.id,
+    board: normalizeBoard(state),
+    theme,
+    labels,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabaseClient
+    .from(WORKSPACE_TABLE)
+    .upsert(payload, { onConflict: "user_id" });
+
+  if (error) {
+    setAuthStatus("Доска сохранена на этом устройстве, но облачное сохранение еще не подключено в Supabase.", "error");
   }
 }
 
@@ -2412,6 +2508,11 @@ async function signUpWithEmail(event) {
     setAuthStatus(`Регистрация не прошла: ${translateAuthError(error.message)}`, "error");
     return;
   }
+  if (isExistingUserSignup(data)) {
+    setAuthMode("sign-in");
+    setAuthStatus("Такой пользователь уже создан. Войдите через e-mail и пароль или восстановите пароль.", "error");
+    return;
+  }
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
   if (data?.session?.user || data?.user) {
@@ -2466,6 +2567,14 @@ async function registerWithEmailFetch(email, password) {
   } catch (error) {
     return { error };
   }
+}
+
+function isExistingUserSignup(data) {
+  const user = data?.user;
+  if (!user) {
+    return false;
+  }
+  return Array.isArray(user.identities) && user.identities.length === 0;
 }
 
 async function sendPasswordResetEmail() {
