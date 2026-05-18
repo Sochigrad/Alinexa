@@ -1492,6 +1492,7 @@ textarea {
 const STORAGE_KEY = "taskflow-board-v1";
 const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
+const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -1630,6 +1631,9 @@ let dragFrame = null;
 let supabaseClient = null;
 let currentUser = null;
 let remoteSaveTimer = null;
+let remoteSyncTimer = null;
+let remoteWorkspaceUpdatedAt = "";
+let localWorkspaceUpdatedAt = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || 0);
 let isApplyingRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
 let recognition = null;
@@ -1748,6 +1752,12 @@ dictateDescriptionButton.addEventListener("click", () => toggleVoiceRecognition(
 document.querySelector("#clearVoiceTextButton").addEventListener("click", clearVoiceText);
 document.querySelector("#resetThemeButton").addEventListener("click", resetTheme);
 backgroundFileInput.addEventListener("change", uploadBackground);
+window.addEventListener("focus", syncRemoteWorkspace);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    syncRemoteWorkspace();
+  }
+});
 cardFocusInput.addEventListener("change", () => {
   if (cardFocusInput.checked && cardStatusInput.value === "planned") {
     cardStatusInput.value = "today";
@@ -1794,6 +1804,9 @@ document.querySelectorAll("[data-preset]").forEach((button) => {
 
 applyTheme(theme);
 render();
+if (!localWorkspaceUpdatedAt && hasLocalWorkspaceContent()) {
+  markLocalWorkspaceChanged();
+}
 initAuth();
 
 function loadBoard() {
@@ -1814,8 +1827,31 @@ function loadBoard() {
 }
 
 function persist() {
+  markLocalWorkspaceChanged();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   queueRemoteWorkspaceSave();
+}
+
+function markLocalWorkspaceChanged() {
+  localWorkspaceUpdatedAt = Date.now();
+  localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
+}
+
+function hasLocalWorkspaceContent() {
+  return Boolean(localWorkspaceUpdatedAt) || hasUserBoardContent();
+}
+
+function hasUserBoardContent() {
+  if (!state.cards.length) {
+    return false;
+  }
+
+  if (state.cards.length !== defaultBoard.cards.length || state.columns.length !== defaultBoard.columns.length) {
+    return true;
+  }
+
+  const defaultTitles = new Set(defaultBoard.cards.map((card) => card.title));
+  return state.cards.some((card) => !defaultTitles.has(card.title));
 }
 
 function normalizeBoard(board) {
@@ -1889,11 +1925,13 @@ function loadLabels() {
 }
 
 function persistTheme() {
+  markLocalWorkspaceChanged();
   localStorage.setItem(THEME_KEY, JSON.stringify(theme));
   queueRemoteWorkspaceSave();
 }
 
 function persistLabels() {
+  markLocalWorkspaceChanged();
   localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
   queueRemoteWorkspaceSave();
 }
@@ -2367,6 +2405,10 @@ async function initAuth() {
     }
     if (currentUser && event === "SIGNED_IN") {
       await loadRemoteWorkspace();
+      startRemoteSync();
+    }
+    if (!currentUser && event === "SIGNED_OUT") {
+      stopRemoteSync();
     }
   });
 
@@ -2375,6 +2417,7 @@ async function initAuth() {
   updateAuthUi(currentUser);
   if (currentUser) {
     await loadRemoteWorkspace();
+    startRemoteSync();
   }
 
   if (currentUser && hasPasswordRecoveryUrl()) {
@@ -2436,7 +2479,7 @@ async function loadRemoteWorkspace() {
 
   const { data, error } = await supabaseClient
     .from(WORKSPACE_TABLE)
-    .select("board, theme, labels")
+    .select("board, theme, labels, updated_at")
     .eq("user_id", currentUser.id)
     .maybeSingle();
 
@@ -2446,10 +2489,19 @@ async function loadRemoteWorkspace() {
   }
 
   if (!data) {
+    if (hasLocalWorkspaceContent()) {
+      await saveRemoteWorkspace();
+    }
+    return;
+  }
+
+  const remoteTime = Date.parse(data.updated_at || "") || 0;
+  if (localWorkspaceUpdatedAt > remoteTime && hasLocalWorkspaceContent()) {
     await saveRemoteWorkspace();
     return;
   }
 
+  remoteWorkspaceUpdatedAt = data.updated_at || "";
   isApplyingRemoteWorkspace = true;
   if (data.board?.columns && data.board?.cards) {
     state = normalizeBoard(data.board);
@@ -2469,7 +2521,42 @@ async function loadRemoteWorkspace() {
     localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
   }
   isApplyingRemoteWorkspace = false;
+  if (remoteTime) {
+    localWorkspaceUpdatedAt = remoteTime;
+    localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
+  }
   render();
+}
+
+async function syncRemoteWorkspace() {
+  if (!supabaseClient || !currentUser) {
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from(WORKSPACE_TABLE)
+    .select("updated_at")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (error || !data?.updated_at || data.updated_at === remoteWorkspaceUpdatedAt) {
+    return;
+  }
+
+  const remoteTime = Date.parse(data.updated_at) || 0;
+  if (remoteTime > localWorkspaceUpdatedAt) {
+    await loadRemoteWorkspace();
+  }
+}
+
+function startRemoteSync() {
+  stopRemoteSync();
+  remoteSyncTimer = setInterval(syncRemoteWorkspace, 2500);
+}
+
+function stopRemoteSync() {
+  clearInterval(remoteSyncTimer);
+  remoteSyncTimer = null;
 }
 
 function queueRemoteWorkspaceSave() {
@@ -2499,7 +2586,9 @@ async function saveRemoteWorkspace() {
 
   if (error) {
     setAuthStatus("Доска сохранена на этом устройстве, но облачное сохранение еще не подключено в Supabase.", "error");
+    return;
   }
+  remoteWorkspaceUpdatedAt = payload.updated_at;
 }
 
 function openAuthSheet() {
