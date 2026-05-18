@@ -1630,6 +1630,7 @@ let autoScrollState = { horizontal: 0, vertical: 0, list: null };
 let dragFrame = null;
 let supabaseClient = null;
 let currentUser = null;
+let currentSession = null;
 let remoteSaveTimer = null;
 let remoteSyncTimer = null;
 let remoteWorkspaceUpdatedAt = "";
@@ -2432,6 +2433,7 @@ async function initAuth() {
   }
 
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    currentSession = session || null;
     currentUser = session?.user || null;
     updateAuthUi(currentUser);
     if (event === "PASSWORD_RECOVERY") {
@@ -2460,6 +2462,7 @@ async function initAuth() {
   });
 
   const { data } = await supabaseClient.auth.getSession();
+  currentSession = data.session || null;
   currentUser = data.session?.user || null;
   updateAuthUi(currentUser);
   if (currentUser) {
@@ -2525,14 +2528,10 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
     return;
   }
 
-  const { data, error } = await supabaseClient
-    .from(WORKSPACE_TABLE)
-    .select("board, theme, labels, updated_at")
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
+  const { data, error } = await fetchRemoteWorkspace();
 
   if (error) {
-    setAuthStatus("Вход выполнен. Чтобы доска сохранялась между устройствами, создайте таблицу данных в Supabase.", "error");
+    setAuthStatus(`Вход выполнен, но доска не загрузилась из облака: ${error.message}`, "error");
     return;
   }
 
@@ -2582,11 +2581,7 @@ async function syncRemoteWorkspace() {
     return;
   }
 
-  const { data, error } = await supabaseClient
-    .from(WORKSPACE_TABLE)
-    .select("updated_at")
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
+  const { data, error } = await fetchRemoteWorkspace("updated_at");
 
   if (error || !data?.updated_at || data.updated_at === remoteWorkspaceUpdatedAt) {
     return;
@@ -2615,6 +2610,72 @@ function queueRemoteWorkspaceSave() {
   remoteSaveTimer = setTimeout(saveRemoteWorkspace, 450);
 }
 
+async function getAccessToken() {
+  if (currentSession?.access_token) {
+    return currentSession.access_token;
+  }
+  const { data } = await supabaseClient.auth.getSession();
+  currentSession = data.session || null;
+  currentUser = currentSession?.user || currentUser;
+  return currentSession?.access_token || "";
+}
+
+async function fetchRemoteWorkspace(select = "board,theme,labels,updated_at") {
+  const token = await getAccessToken();
+  if (!token || !currentUser) {
+    return { data: null, error: new Error("Нет активной сессии. Войдите в аккаунт еще раз.") };
+  }
+
+  const params = new URLSearchParams({
+    select,
+    user_id: `eq.${currentUser.id}`,
+    limit: "1",
+  });
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${WORKSPACE_TABLE}?${params}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      return { data: null, error: new Error(body?.message || body?.msg || `Supabase ${response.status}`) };
+    }
+    return { data: Array.isArray(body) ? body[0] || null : body, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
+async function upsertRemoteWorkspace(payload) {
+  const token = await getAccessToken();
+  if (!token || !currentUser) {
+    return { data: null, error: new Error("Нет активной сессии. Войдите в аккаунт еще раз.") };
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${WORKSPACE_TABLE}?on_conflict=user_id`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      return { data: null, error: new Error(body?.message || body?.msg || `Supabase ${response.status}`) };
+    }
+    return { data: Array.isArray(body) ? body[0] || null : body, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
 async function saveRemoteWorkspace() {
   if (!supabaseClient || !currentUser) {
     return;
@@ -2629,17 +2690,15 @@ async function saveRemoteWorkspace() {
   };
 
   isSavingRemoteWorkspace = true;
-  const { error } = await supabaseClient
-    .from(WORKSPACE_TABLE)
-    .upsert(payload, { onConflict: "user_id" });
+  const { data, error } = await upsertRemoteWorkspace(payload);
   isSavingRemoteWorkspace = false;
 
   if (error) {
-    setAuthStatus("Доска сохранена на этом устройстве, но облачное сохранение еще не подключено в Supabase.", "error");
+    setAuthStatus(`Доска сохранена на этом устройстве, но не ушла в облако: ${error.message}`, "error");
     return;
   }
-  remoteWorkspaceUpdatedAt = payload.updated_at;
-  localWorkspaceUpdatedAt = Date.parse(payload.updated_at) || Date.now();
+  remoteWorkspaceUpdatedAt = data?.updated_at || payload.updated_at;
+  localWorkspaceUpdatedAt = Date.parse(remoteWorkspaceUpdatedAt) || Date.now();
   localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
 }
 
@@ -2768,7 +2827,11 @@ async function signUpWithEmail(event) {
   authLastNameInput.value = "";
   if (data?.session?.user || data?.user) {
     currentUser = data.session?.user || data.user;
+    currentSession = data.session || currentSession;
     updateAuthUi(currentUser);
+    await loadRemoteWorkspace({ mergeLocalData: true });
+    hasLoadedRemoteWorkspace = true;
+    startRemoteSync();
     setAuthMode("sign-in");
     setAuthStatus("Регистрация выполнена. Аккаунт создан.", "success");
     return;
@@ -2942,6 +3005,8 @@ async function signOut() {
   }
   await supabaseClient.auth.signOut();
   currentUser = null;
+  currentSession = null;
+  hasLoadedRemoteWorkspace = false;
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
   authForm.classList.remove("is-signed-in");
