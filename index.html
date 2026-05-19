@@ -208,33 +208,50 @@ body:not(.is-authenticated) .topbar {
 }
 
 .welcome-kicker {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
   margin: 0;
   max-width: min(100%, 780px);
-  min-height: 104px;
-  padding: 18px 24px 20px;
-  border: 1px solid rgba(15, 118, 110, 0.22);
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.46)),
-    linear-gradient(120deg, rgba(15, 118, 110, 0.12), rgba(255, 255, 255, 0));
   color: #0b1726;
-  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.13);
-  font-size: clamp(34px, 10vw, 68px);
+  font-size: clamp(34px, 9.4vw, 66px);
   font-weight: 900;
-  line-height: 0.98;
+  line-height: 0.96;
   letter-spacing: 0;
   text-wrap: balance;
 }
 
+.alinexa-i {
+  position: relative;
+  display: inline-block;
+  width: 0.18em;
+  height: 0.63em;
+  margin: 0 0.035em;
+  border-radius: 99px;
+  background: #0b1726;
+  color: transparent;
+  vertical-align: -0.015em;
+}
+
+.alinexa-i::before {
+  content: "";
+  position: absolute;
+  top: -0.3em;
+  left: 50%;
+  width: 0.19em;
+  height: 0.19em;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+
 .welcome-copy h2 {
+  display: grid;
+  gap: 2px;
   margin: 0;
-  max-width: 680px;
-  color: color-mix(in srgb, var(--ink) 88%, var(--accent));
-  font-size: clamp(25px, 6.6vw, 44px);
+  max-width: 880px;
+  color: #111827;
+  font-size: clamp(24px, 6vw, 42px);
   font-weight: 950;
-  line-height: 1.08;
+  line-height: 1.04;
   text-wrap: balance;
 }
 
@@ -1203,13 +1220,11 @@ textarea {
   }
 
   .welcome-kicker {
-    min-height: 126px;
-    padding: 22px 34px 26px;
-    font-size: 74px;
+    font-size: 70px;
   }
 
   .welcome-copy h2 {
-    font-size: 43px;
+    font-size: 40px;
   }
 
   .welcome-actions {
@@ -1406,8 +1421,8 @@ textarea {
 
       <section class="welcome-screen" id="welcomeScreen" aria-label="Старт Alinexa">
         <div class="welcome-copy">
-          <p class="welcome-kicker">Мобильная доска Alinexa</p>
-          <h2>Задачи, идеи и&nbsp;дела — в&nbsp;одном аккуратном месте</h2>
+          <p class="welcome-kicker">Мобильная доска Al<span class="alinexa-i" aria-label="i">i</span>nexa</p>
+          <h2><span>Задачи, идеи и&nbsp;дела —</span><span>в&nbsp;одном аккуратном месте</span></h2>
           <p>
             Записывайте мысли голосом, раскладывайте карточки по&nbsp;колонкам, отмечайте важное
             на&nbsp;сегодня и&nbsp;возвращайтесь к&nbsp;своей доске с&nbsp;телефона или&nbsp;компьютера.
