@@ -1808,13 +1808,15 @@ const defaultBoard = {
       createdAt: Date.now() - 1000,
     },
   ],
+  deletedCards: {},
 };
 
 function createPrivateEmptyBoard() {
-  return {
+  return normalizeBoard({
     columns: structuredClone(defaultBoard.columns),
     cards: [],
-  };
+    deletedCards: {},
+  });
 }
 
 let state = loadBoard();
@@ -2039,17 +2041,17 @@ initAuth();
 function loadBoard() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (!saved) {
-    return structuredClone(defaultBoard);
+    return normalizeBoard(defaultBoard);
   }
 
   try {
     const parsed = JSON.parse(saved);
     if (!Array.isArray(parsed.columns) || !Array.isArray(parsed.cards)) {
-      return structuredClone(defaultBoard);
+      return normalizeBoard(defaultBoard);
     }
     return normalizeBoard(parsed);
   } catch {
-    return structuredClone(defaultBoard);
+    return normalizeBoard(defaultBoard);
   }
 }
 
@@ -2091,25 +2093,30 @@ function areBoardsEqual(firstBoard, secondBoard) {
 }
 
 function mergeBoards(localBoard, remoteBoard) {
+  const normalizedLocal = normalizeBoard(localBoard);
+  const normalizedRemote = normalizeBoard(remoteBoard);
+  const deletedCards = {
+    ...normalizedRemote.deletedCards,
+    ...normalizedLocal.deletedCards,
+  };
+  const deletedIds = new Set(Object.keys(deletedCards));
   const columnMap = new Map();
-  [...remoteBoard.columns, ...localBoard.columns].forEach((column) => {
+  [...normalizedRemote.columns, ...normalizedLocal.columns].forEach((column) => {
     if (!column?.id || columnMap.has(column.id)) {
       return;
     }
     columnMap.set(column.id, { ...column });
   });
 
-  const titleToRemoteCard = new Map();
-  remoteBoard.cards.forEach((card) => {
-    titleToRemoteCard.set(normalizeMergeKey(card.title), card);
-  });
-
   const cardMap = new Map();
-  remoteBoard.cards.forEach((card) => cardMap.set(card.id, { ...card }));
-  localBoard.cards.forEach((card) => {
-    const sameTitleRemote = titleToRemoteCard.get(normalizeMergeKey(card.title));
-    const mergeId = cardMap.has(card.id) ? card.id : sameTitleRemote?.id || card.id;
-    cardMap.set(mergeId, { ...(cardMap.get(mergeId) || {}), ...card, id: mergeId });
+  [...normalizedRemote.cards, ...normalizedLocal.cards].forEach((card) => {
+    if (!card?.id || deletedIds.has(card.id)) {
+      return;
+    }
+    const previousCard = cardMap.get(card.id);
+    if (!previousCard || getCardVersion(card) >= getCardVersion(previousCard)) {
+      cardMap.set(card.id, { ...card });
+    }
   });
 
   const columnIds = new Set(columnMap.keys());
@@ -2121,6 +2128,7 @@ function mergeBoards(localBoard, remoteBoard) {
   return normalizeBoard({
     columns: [...columnMap.values()],
     cards,
+    deletedCards,
   });
 }
 
@@ -2128,8 +2136,46 @@ function normalizeMergeKey(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function getCardVersion(card) {
+  return Number(card?.updatedAt || card?.createdAt || 0);
+}
+
+function normalizeDeletedCards(value) {
+  if (!value) {
+    return {};
+  }
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value.filter(Boolean).map((id) => [String(id), 1]));
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([id]) => id)
+        .map(([id, deletedAt]) => [String(id), Number(deletedAt) || 1]),
+    );
+  }
+  return {};
+}
+
 function normalizeBoard(board) {
-  const nextBoard = structuredClone(board);
+  const now = Date.now();
+  const nextBoard = {
+    columns: Array.isArray(board?.columns) ? structuredClone(board.columns) : structuredClone(defaultBoard.columns),
+    cards: Array.isArray(board?.cards) ? structuredClone(board.cards) : [],
+    deletedCards: normalizeDeletedCards(board?.deletedCards || board?.deletedCardIds),
+  };
+  const columnIds = new Set(nextBoard.columns.map((column) => column.id));
+  const fallbackColumnId = nextBoard.columns[0]?.id || defaultBoard.columns[0]?.id || "";
+  const deletedIds = new Set(Object.keys(nextBoard.deletedCards));
+  nextBoard.cards = nextBoard.cards
+    .filter((card) => card?.id && !deletedIds.has(card.id))
+    .map((card, index) => ({
+      ...card,
+      columnId: columnIds.has(card.columnId) ? card.columnId : fallbackColumnId,
+      order: Number.isFinite(card.order) ? card.order : index,
+      createdAt: Number(card.createdAt) || now,
+      updatedAt: Number(card.updatedAt) || Number(card.createdAt) || now,
+    }));
   nextBoard.columns.forEach((column) => {
     nextBoard.cards
       .filter((card) => card.columnId === column.id)
@@ -2139,6 +2185,11 @@ function normalizeBoard(board) {
       });
   });
   return nextBoard;
+}
+
+function markCardDeleted(cardId) {
+  state.deletedCards = normalizeDeletedCards(state.deletedCards);
+  state.deletedCards[cardId] = Date.now();
 }
 
 function loadTheme() {
@@ -2977,7 +3028,7 @@ async function syncRemoteWorkspace() {
 
 function startRemoteSync() {
   stopRemoteSync();
-  remoteSyncTimer = setInterval(syncRemoteWorkspace, 2500);
+  remoteSyncTimer = setInterval(syncRemoteWorkspace, 1200);
 }
 
 function stopRemoteSync() {
@@ -3071,16 +3122,25 @@ async function saveRemoteWorkspace() {
 
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
-  const saveStartedAt = localWorkspaceUpdatedAt || Date.now();
+  isSavingRemoteWorkspace = true;
+  let boardToSave = normalizeBoard(state);
+  const { data: remoteData } = await fetchRemoteWorkspace("board,updated_at");
+  const remoteBoard = remoteData?.board?.columns && remoteData.board?.cards ? normalizeBoard(remoteData.board) : null;
+  if (remoteBoard && !areBoardsEqual(boardToSave, remoteBoard)) {
+    boardToSave = mergeBoards(boardToSave, remoteBoard);
+    state = boardToSave;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    scheduleCardReminders();
+    render();
+  }
+  const saveStartedAt = Date.now();
   const payload = {
     user_id: currentUser.id,
-    board: normalizeBoard(state),
+    board: boardToSave,
     theme,
     labels,
     updated_at: new Date(saveStartedAt).toISOString(),
   };
-
-  isSavingRemoteWorkspace = true;
   const { data, error } = await upsertRemoteWorkspace(payload);
   isSavingRemoteWorkspace = false;
 
@@ -3091,9 +3151,7 @@ async function saveRemoteWorkspace() {
   remoteWorkspaceUpdatedAt = data?.updated_at || payload.updated_at;
   localWorkspaceUpdatedAt = Date.parse(remoteWorkspaceUpdatedAt) || Date.now();
   localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
-  if (localWorkspaceUpdatedAt === saveStartedAt) {
-    hasUnsavedLocalChanges = false;
-  }
+  hasUnsavedLocalChanges = false;
   if (hasQueuedRemoteSaveAfterCurrent) {
     hasQueuedRemoteSaveAfterCurrent = false;
     await saveRemoteWorkspace();
@@ -3685,6 +3743,7 @@ function closeSheets() {
 async function saveCard(event) {
   event.preventDefault();
   const reminderEnabled = cardReminderInput.checked;
+  const changedAt = Date.now();
   const payload = {
     title: cardTitleInput.value.trim(),
     description: cardDescriptionInput.value.trim(),
@@ -3695,6 +3754,7 @@ async function saveCard(event) {
     plannedDate: cardDateInput.value,
     plannedTime: cardTimeInput.value,
     reminderEnabled,
+    updatedAt: changedAt,
   };
 
   if (!payload.title) {
@@ -3732,7 +3792,7 @@ async function saveCard(event) {
       id: crypto.randomUUID(),
       ...payload,
       order: getNextOrder(payload.columnId),
-      createdAt: Date.now(),
+      createdAt: changedAt,
     });
   }
 
@@ -3792,7 +3852,9 @@ async function deleteActiveCard(event) {
   if (!activeCardId) {
     return;
   }
+  markCardDeleted(activeCardId);
   state.cards = state.cards.filter((card) => card.id !== activeCardId);
+  state = normalizeBoard(state);
   const savePromise = persist({ immediate: true });
   render();
   closeSheets();
@@ -3808,6 +3870,7 @@ async function saveVoiceCard(event) {
   }
 
   const title = createTitleFromVoice(text);
+  const createdAt = Date.now();
   state.cards.push({
     id: crypto.randomUUID(),
     columnId: voiceColumnInput.value,
@@ -3817,7 +3880,8 @@ async function saveVoiceCard(event) {
     focus: voiceFocusInput.checked,
     status: voiceStatusInput.value,
     order: getNextOrder(voiceColumnInput.value),
-    createdAt: Date.now(),
+    createdAt,
+    updatedAt: createdAt,
   });
 
   quickColumnId = voiceColumnInput.value;
@@ -3833,7 +3897,7 @@ function resetBoard() {
   if (!wantsReset) {
     return;
   }
-  state = structuredClone(defaultBoard);
+  state = normalizeBoard(defaultBoard);
   quickColumnId = state.columns[0]?.id || "";
   persist();
   render();
@@ -4202,18 +4266,24 @@ function moveCardToPosition(cardId, columnId, dropIndex) {
     return;
   }
 
+  const changedAt = Date.now();
+  const sourceColumnId = movingCard.columnId;
   const otherCards = state.cards.filter((card) => card.id !== cardId);
   const targetCards = otherCards.filter((card) => card.columnId === columnId).sort(sortCards);
   const safeIndex = Math.max(0, Math.min(dropIndex ?? targetCards.length, targetCards.length));
-  const movedCard = { ...movingCard, columnId };
+  const movedCard = { ...movingCard, columnId, updatedAt: changedAt };
   targetCards.splice(safeIndex, 0, movedCard);
 
-  const reorderedTargetCards = targetCards.map((card, index) => ({ ...card, order: index }));
+  const reorderedTargetCards = targetCards.map((card, index) => ({ ...card, order: index, updatedAt: changedAt }));
   const targetIds = new Set(reorderedTargetCards.map((card) => card.id));
   state.cards = otherCards
     .filter((card) => !targetIds.has(card.id))
     .concat(reorderedTargetCards);
   state = normalizeBoard(state);
+  const affectedColumns = new Set([sourceColumnId, columnId]);
+  state.cards = state.cards.map((card) =>
+    affectedColumns.has(card.columnId) ? { ...card, updatedAt: changedAt } : card,
+  );
 }
 
 function getDropIndex(list, clientY, draggedCardId) {
