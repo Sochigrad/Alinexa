@@ -96,13 +96,8 @@ body.is-authenticated .welcome-screen {
   display: none;
 }
 
-body:not(.is-authenticated) #menuButton,
-body:not(.is-authenticated) #accountButton {
-  display: none;
-}
-
 body:not(.is-authenticated) .topbar {
-  grid-template-columns: minmax(0, 1fr);
+  display: none;
 }
 
 .topbar {
@@ -177,30 +172,34 @@ body:not(.is-authenticated) .topbar {
 .welcome-screen {
   display: grid;
   align-content: center;
+  justify-items: center;
   gap: 22px;
-  min-height: calc(100svh - 86px);
+  min-height: 100svh;
   padding: 28px 14px calc(36px + var(--safe-bottom));
+  text-align: center;
 }
 
 .welcome-copy {
   display: grid;
+  justify-items: center;
   gap: 14px;
   max-width: 720px;
 }
 
 .welcome-kicker {
   margin: 0;
-  color: var(--accent);
-  font-size: 12px;
+  max-width: 760px;
+  color: var(--ink);
+  font-size: clamp(36px, 10vw, 72px);
   font-weight: 900;
+  line-height: 1.03;
   letter-spacing: 0;
-  text-transform: uppercase;
 }
 
 .welcome-copy h2 {
   margin: 0;
   max-width: 720px;
-  font-size: 34px;
+  font-size: clamp(26px, 7vw, 46px);
   font-weight: 950;
   line-height: 1.04;
 }
@@ -211,10 +210,12 @@ body:not(.is-authenticated) .topbar {
   color: color-mix(in srgb, var(--ink) 72%, var(--muted));
   font-size: 17px;
   line-height: 1.5;
+  text-align: center;
 }
 
 .welcome-actions {
   display: grid;
+  justify-self: center;
   gap: 10px;
   width: min(100%, 380px);
 }
@@ -680,6 +681,11 @@ body:not(.is-authenticated) .topbar {
 .sheet.compact {
   max-height: 62vh;
   max-height: 62svh;
+}
+
+#authSheet.compact {
+  height: min(92svh, calc(var(--visual-viewport-height, 100vh) - 12px));
+  max-height: min(92svh, calc(var(--visual-viewport-height, 100vh) - 12px));
 }
 
 .sheet-handle {
@@ -1158,12 +1164,16 @@ textarea {
   }
 
   .welcome-screen {
-    min-height: calc(100svh - 112px);
+    min-height: 100svh;
     padding: 56px 18px 120px;
   }
 
+  .welcome-kicker {
+    font-size: 76px;
+  }
+
   .welcome-copy h2 {
-    font-size: 52px;
+    font-size: 46px;
   }
 
   .welcome-actions {
@@ -2020,6 +2030,8 @@ resetPasswordButton.addEventListener("click", sendPasswordResetEmail);
 signOutButton.addEventListener("click", signOut);
 signOutButton.addEventListener("pointerup", (event) => {
   if (event.pointerType === "touch") {
+    event.preventDefault();
+    event.stopPropagation();
     signOut(event);
   }
 });
@@ -2246,10 +2258,13 @@ function loadLabels() {
   }
 }
 
-function persistTheme() {
+function persistTheme({ immediate = false } = {}) {
   markLocalWorkspaceChanged();
   localStorage.setItem(THEME_KEY, JSON.stringify(theme));
   hasUnsavedLocalChanges = true;
+  if (immediate) {
+    return saveRemoteWorkspace();
+  }
   queueRemoteWorkspaceSave();
 }
 
@@ -3134,6 +3149,7 @@ async function saveRemoteWorkspace() {
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
   isSavingRemoteWorkspace = true;
+  try {
   const boardToSave = normalizeBoard(state);
   const themeToSave = await getRemoteSafeTheme();
   const saveStartedAt = Date.now();
@@ -3155,6 +3171,9 @@ async function saveRemoteWorkspace() {
   localWorkspaceUpdatedAt = Date.parse(remoteWorkspaceUpdatedAt) || Date.now();
   localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
   hasUnsavedLocalChanges = false;
+  } finally {
+    isSavingRemoteWorkspace = false;
+  }
   if (hasQueuedRemoteSaveAfterCurrent) {
     hasQueuedRemoteSaveAfterCurrent = false;
     await saveRemoteWorkspace();
@@ -3165,14 +3184,14 @@ function openAuthSheet() {
   setAuthMode("sign-in");
   openSheet(authSheet);
   if (!currentUser) {
-    authEmailInput.focus();
+    focusFieldAtSheetStart(authSheet, authEmailInput);
   }
 }
 
 function openRegistrationSheet() {
   setAuthMode("sign-up");
   openSheet(authSheet);
-  authEmailInput.focus();
+  focusFieldAtSheetStart(authSheet, authEmailInput);
 }
 
 function handleAuthSubmit(event) {
@@ -3197,7 +3216,7 @@ function setAuthMode(mode) {
   authForm.classList.toggle("is-sign-up", isSignUp);
   authForm.classList.toggle("is-password-reset", isPasswordReset);
   authForm.classList.toggle("is-signed-in", isSignedIn);
-  authTitle.textContent = isPasswordReset ? "Новый пароль" : isSignUp ? "Регистрация" : isSignedIn ? "Кабинет" : "Аккаунт";
+  authTitle.textContent = isPasswordReset ? "Новый пароль" : isSignUp ? "Регистрация" : "Личный кабинет";
   authSheet.setAttribute("aria-label", authTitle.textContent);
   authEmailLabel.hidden = isPasswordReset;
   authEmailInput.required = !isPasswordReset;
@@ -3213,8 +3232,8 @@ function setAuthMode(mode) {
   authPasswordInput.autocomplete = isSignUp || isPasswordReset ? "new-password" : "current-password";
   signInButton.textContent = isPasswordReset ? "Сохранить пароль" : isSignUp ? "Зарегистрироваться" : "Войти";
   signUpButton.textContent = "Регистрация";
-  signUpButton.hidden = isSignUp || isPasswordReset;
-  resetPasswordButton.hidden = isSignUp || isPasswordReset;
+  signUpButton.hidden = true;
+  resetPasswordButton.hidden = isSignUp || isPasswordReset || isSignedIn;
   signOutButton.hidden = !currentUser || isSignUp || isPasswordReset;
   setAuthStatus(
     isPasswordReset
@@ -3250,6 +3269,7 @@ async function signInWithEmail(event) {
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
   setAuthStatus("Вход выполнен.", "success");
+  closeSheets();
 }
 
 async function signUpWithEmail(event) {
@@ -3539,6 +3559,7 @@ async function signOut(event) {
     updateAuthUi(null);
     setAuthMode("sign-in");
     setAuthStatus("Вы вышли из аккаунта. Доска очищена на этом устройстве.", "success");
+    closeSheets();
     setAuthBusy(false);
     isSigningOut = false;
   }
@@ -3935,7 +3956,7 @@ function saveTheme(event) {
   event.preventDefault();
   theme = readThemeInputs();
   applyTheme(theme);
-  persistTheme();
+  persistTheme({ immediate: true });
   markSelectedPreset();
   closeSheets();
 }
@@ -3943,7 +3964,7 @@ function saveTheme(event) {
 function resetTheme() {
   previewTheme(defaultTheme);
   theme = { ...defaultTheme };
-  persistTheme();
+  persistTheme({ immediate: true });
   renderBackgroundChoices();
 }
 
@@ -4005,7 +4026,7 @@ function renderBackgroundChoices() {
     button.addEventListener("click", () => {
       theme = { ...theme, background: preset.id, customBackground: "" };
       applyTheme(theme);
-      persistTheme();
+      persistTheme({ immediate: true });
       renderBackgroundChoices();
     });
     backgroundGrid.append(button);
@@ -4026,7 +4047,7 @@ function uploadBackground(event) {
       customBackground: dataUrl,
     };
     applyTheme(theme);
-    persistTheme();
+    persistTheme({ immediate: true });
     renderBackgroundChoices();
     backgroundFileInput.value = "";
     })
@@ -4035,7 +4056,7 @@ function uploadBackground(event) {
     });
 }
 
-function resizeImageFile(file, maxSize = 1600, quality = 0.72) {
+function resizeImageFile(file, maxSize = 1200, quality = 0.62) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("error", reject);
@@ -4046,7 +4067,7 @@ function resizeImageFile(file, maxSize = 1600, quality = 0.72) {
   });
 }
 
-function resizeDataUrl(dataUrl, maxSize = 1600, quality = 0.72) {
+function resizeDataUrl(dataUrl, maxSize = 1200, quality = 0.62) {
   return new Promise((resolve, reject) => {
     if (!dataUrl.startsWith("data:image/") || dataUrl.length < 650000) {
       resolve(dataUrl);
@@ -4068,7 +4089,11 @@ function resizeDataUrl(dataUrl, maxSize = 1600, quality = 0.72) {
         return;
       }
       context.drawImage(image, 0, 0, width, height);
-      const compressed = canvas.toDataURL("image/jpeg", quality);
+      let compressed = canvas.toDataURL("image/jpeg", quality);
+      if (compressed.length > 900000 && maxSize > 720) {
+        resizeDataUrl(compressed, 720, 0.56).then(resolve).catch(reject);
+        return;
+      }
       resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
     });
     image.src = dataUrl;
