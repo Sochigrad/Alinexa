@@ -2249,12 +2249,14 @@ function loadLabels() {
 function persistTheme() {
   markLocalWorkspaceChanged();
   localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+  hasUnsavedLocalChanges = true;
   queueRemoteWorkspaceSave();
 }
 
 function persistLabels() {
   markLocalWorkspaceChanged();
   localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
+  hasUnsavedLocalChanges = true;
   queueRemoteWorkspaceSave();
 }
 
@@ -3132,21 +3134,13 @@ async function saveRemoteWorkspace() {
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
   isSavingRemoteWorkspace = true;
-  let boardToSave = normalizeBoard(state);
-  const { data: remoteData } = await fetchRemoteWorkspace("board,updated_at");
-  const remoteBoard = remoteData?.board?.columns && remoteData.board?.cards ? normalizeBoard(remoteData.board) : null;
-  if (remoteBoard && !areBoardsEqual(boardToSave, remoteBoard)) {
-    boardToSave = mergeBoards(boardToSave, remoteBoard);
-    state = boardToSave;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    scheduleCardReminders();
-    render();
-  }
+  const boardToSave = normalizeBoard(state);
+  const themeToSave = await getRemoteSafeTheme();
   const saveStartedAt = Date.now();
   const payload = {
     user_id: currentUser.id,
     board: boardToSave,
-    theme,
+    theme: themeToSave,
     labels,
     updated_at: new Date(saveStartedAt).toISOString(),
   };
@@ -4024,19 +4018,82 @@ function uploadBackground(event) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
+  resizeImageFile(file)
+    .then((dataUrl) => {
     theme = {
       ...theme,
       background: "custom",
-      customBackground: String(reader.result || ""),
+      customBackground: dataUrl,
     };
     applyTheme(theme);
     persistTheme();
     renderBackgroundChoices();
     backgroundFileInput.value = "";
+    })
+    .catch(() => {
+      backgroundFileInput.value = "";
+    });
+}
+
+function resizeImageFile(file, maxSize = 1600, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("error", reject);
+    reader.addEventListener("load", () => {
+      resizeDataUrl(String(reader.result || ""), maxSize, quality).then(resolve).catch(reject);
+    });
+    reader.readAsDataURL(file);
   });
-  reader.readAsDataURL(file);
+}
+
+function resizeDataUrl(dataUrl, maxSize = 1600, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    if (!dataUrl.startsWith("data:image/") || dataUrl.length < 650000) {
+      resolve(dataUrl);
+      return;
+    }
+
+    const image = new Image();
+    image.addEventListener("error", reject);
+    image.addEventListener("load", () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(dataUrl);
+        return;
+      }
+      context.drawImage(image, 0, 0, width, height);
+      const compressed = canvas.toDataURL("image/jpeg", quality);
+      resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+    });
+    image.src = dataUrl;
+  });
+}
+
+async function getRemoteSafeTheme() {
+  if (!theme.customBackground || theme.customBackground.length < 650000) {
+    return theme;
+  }
+
+  try {
+    const compressed = await resizeDataUrl(theme.customBackground);
+    if (compressed !== theme.customBackground) {
+      theme = { ...theme, customBackground: compressed };
+      localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+      applyTheme(theme);
+    }
+  } catch {
+    theme = { ...theme, background: "mist", customBackground: "" };
+    localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+    applyTheme(theme);
+  }
+
+  return theme;
 }
 
 function saveLabels(event) {
