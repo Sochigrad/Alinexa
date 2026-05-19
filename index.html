@@ -1840,6 +1840,7 @@ let remoteWorkspaceUpdatedAt = "";
 let localWorkspaceUpdatedAt = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || 0);
 let isApplyingRemoteWorkspace = false;
 let isSavingRemoteWorkspace = false;
+let hasQueuedRemoteSaveAfterCurrent = false;
 let hasUnsavedLocalChanges = false;
 let hasLoadedRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
@@ -2069,7 +2070,7 @@ function markLocalWorkspaceChanged() {
 }
 
 function hasLocalWorkspaceContent() {
-  return Boolean(localWorkspaceUpdatedAt) || hasUserBoardContent(state);
+  return hasUserBoardContent(state);
 }
 
 function hasUserBoardContent(board = state) {
@@ -2809,7 +2810,7 @@ async function initAuth() {
       return;
     }
     if (currentUser && event === "SIGNED_IN") {
-      await loadRemoteWorkspace({ mergeLocalData: !hasLoadedRemoteWorkspace });
+      await loadRemoteWorkspace({ mergeLocalData: false });
       hasLoadedRemoteWorkspace = true;
       startRemoteSync();
     }
@@ -2824,7 +2825,7 @@ async function initAuth() {
   currentUser = data.session?.user || null;
   updateAuthUi(currentUser);
   if (currentUser) {
-    await loadRemoteWorkspace({ mergeLocalData: !hasLoadedRemoteWorkspace });
+    await loadRemoteWorkspace({ mergeLocalData: false });
     hasLoadedRemoteWorkspace = true;
     startRemoteSync();
   }
@@ -2899,25 +2900,28 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   }
 
   if (!data) {
-    if (hasLocalWorkspaceContent()) {
-      await saveRemoteWorkspace();
-    }
-    return;
-  }
-
-  const remoteTime = Date.parse(data.updated_at || "") || 0;
-  remoteWorkspaceUpdatedAt = data.updated_at || "";
-  const localTime = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || localWorkspaceUpdatedAt || 0);
-  if (mergeLocalData && localTime > remoteTime) {
+    isApplyingRemoteWorkspace = true;
+    state = createPrivateEmptyBoard();
+    quickColumnId = state.columns[0]?.id || "";
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    isApplyingRemoteWorkspace = false;
+    markLocalWorkspaceChanged();
+    render();
     await saveRemoteWorkspace();
     return;
   }
+
   isApplyingRemoteWorkspace = true;
   const localBoard = normalizeBoard(state);
   const remoteBoard = data.board?.columns && data.board?.cards ? normalizeBoard(data.board) : null;
-  const shouldMerge = mergeLocalData && remoteBoard && hasUserBoardContent(localBoard) && !areBoardsEqual(localBoard, remoteBoard);
+  const localHasContent = mergeLocalData && hasUserBoardContent(localBoard);
+  const remoteHasContent = remoteBoard && hasUserBoardContent(remoteBoard);
+  const shouldMerge = Boolean(
+    localHasContent && remoteHasContent && remoteBoard && !areBoardsEqual(localBoard, remoteBoard),
+  );
+  const shouldSeedRemote = Boolean(localHasContent && remoteBoard && !remoteHasContent);
   if (remoteBoard) {
-    state = shouldMerge ? mergeBoards(localBoard, remoteBoard) : remoteBoard;
+    state = shouldMerge ? mergeBoards(localBoard, remoteBoard) : shouldSeedRemote ? localBoard : remoteBoard;
     quickColumnId = state.columns[0]?.id || "";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -2934,15 +2938,18 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
     localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
   }
   isApplyingRemoteWorkspace = false;
+  const remoteTime = Date.parse(data.updated_at || "") || 0;
+  remoteWorkspaceUpdatedAt = data.updated_at || "";
   if (remoteTime) {
     localWorkspaceUpdatedAt = remoteTime;
     localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
   }
-  if (!shouldMerge) {
+  if (!shouldMerge && !shouldSeedRemote) {
     hasUnsavedLocalChanges = false;
   }
   render();
-  if (shouldMerge) {
+  if (shouldMerge || shouldSeedRemote) {
+    markLocalWorkspaceChanged();
     await saveRemoteWorkspace();
   }
 }
@@ -3053,7 +3060,12 @@ async function upsertRemoteWorkspace(payload) {
 }
 
 async function saveRemoteWorkspace() {
-  if (!supabaseClient || !currentUser || isSavingRemoteWorkspace) {
+  if (!supabaseClient || !currentUser) {
+    return;
+  }
+
+  if (isSavingRemoteWorkspace) {
+    hasQueuedRemoteSaveAfterCurrent = true;
     return;
   }
 
@@ -3081,6 +3093,10 @@ async function saveRemoteWorkspace() {
   localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
   if (localWorkspaceUpdatedAt === saveStartedAt) {
     hasUnsavedLocalChanges = false;
+  }
+  if (hasQueuedRemoteSaveAfterCurrent) {
+    hasQueuedRemoteSaveAfterCurrent = false;
+    await saveRemoteWorkspace();
   }
 }
 
@@ -3217,7 +3233,7 @@ async function signUpWithEmail(event) {
     currentUser = data.session?.user || data.user;
     currentSession = data.session || currentSession;
     updateAuthUi(currentUser);
-    await loadRemoteWorkspace({ mergeLocalData: true });
+    await loadRemoteWorkspace({ mergeLocalData: false });
     hasLoadedRemoteWorkspace = true;
     startRemoteSync();
     setAuthMode("sign-in");
@@ -3721,12 +3737,13 @@ async function saveCard(event) {
   }
 
   quickColumnId = payload.columnId;
-  persist();
+  const savePromise = persist({ immediate: true });
   render();
   closeSheets();
+  await savePromise;
 }
 
-function saveColumn(event) {
+async function saveColumn(event) {
   event.preventDefault();
   const title = columnTitleInput.value.trim();
   if (!title) {
@@ -3737,18 +3754,20 @@ function saveColumn(event) {
     state.columns = state.columns.map((column) =>
       column.id === activeColumnId ? { ...column, title } : column,
     );
-    persist();
+    const savePromise = persist({ immediate: true });
     render();
     closeSheets();
+    await savePromise;
     return;
   }
 
   const id = `column-${crypto.randomUUID()}`;
   state.columns.push({ id, title });
   quickColumnId = id;
-  persist();
+  const savePromise = persist({ immediate: true });
   render();
   closeSheets();
+  await savePromise;
 }
 
 function deleteActiveColumn() {
@@ -3780,7 +3799,7 @@ async function deleteActiveCard(event) {
   await savePromise;
 }
 
-function saveVoiceCard(event) {
+async function saveVoiceCard(event) {
   event.preventDefault();
   const text = voiceTextInput.value.trim();
   if (!text) {
@@ -3802,10 +3821,11 @@ function saveVoiceCard(event) {
   });
 
   quickColumnId = voiceColumnInput.value;
-  persist();
+  const savePromise = persist({ immediate: true });
   render();
   clearVoiceText();
   closeSheets();
+  await savePromise;
 }
 
 function resetBoard() {
