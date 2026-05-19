@@ -2832,6 +2832,7 @@ function renderStats() {
 }
 
 async function initAuth() {
+  const arrivedFromSignupConfirmation = hasSignupConfirmationUrl();
   supabaseClient = getSupabaseClient();
   if (!supabaseClient) {
     updateAuthUi(null);
@@ -2864,6 +2865,12 @@ async function initAuth() {
       await loadRemoteWorkspace({ mergeLocalData: false });
       hasLoadedRemoteWorkspace = true;
       startRemoteSync();
+      if (arrivedFromSignupConfirmation || hasSignupConfirmationUrl()) {
+        setAuthMode("sign-in");
+        openSheet(authSheet);
+        setAuthStatus("Аккаунт подтвержден. Вы уже в своем кабинете.", "success");
+        clearAuthUrl();
+      }
     }
     if (!currentUser && event === "SIGNED_OUT") {
       hasLoadedRemoteWorkspace = false;
@@ -2886,6 +2893,11 @@ async function initAuth() {
     setAuthMode("password-reset");
     openSheet(authSheet);
     setAuthStatus("Введите\u00a0новый пароль и\u00a0повторите его.", "success");
+  } else if (currentUser && (arrivedFromSignupConfirmation || hasSignupConfirmationUrl())) {
+    setAuthMode("sign-in");
+    openSheet(authSheet);
+    setAuthStatus("Аккаунт подтвержден. Вы уже в своем кабинете.", "success");
+    clearAuthUrl();
   }
 }
 
@@ -3287,18 +3299,18 @@ async function signUpWithEmail(event) {
   authLoginInput.value = "";
   authFirstNameInput.value = "";
   authLastNameInput.value = "";
-  if (data?.session?.user || data?.user) {
-    currentUser = data.session?.user || data.user;
-    currentSession = data.session || currentSession;
+  if (data?.session?.user) {
+    currentUser = data.session.user;
+    currentSession = data.session;
     updateAuthUi(currentUser);
     await loadRemoteWorkspace({ mergeLocalData: false });
     hasLoadedRemoteWorkspace = true;
     startRemoteSync();
     setAuthMode("sign-in");
-    setAuthStatus("Регистрация выполнена. Аккаунт создан.", "success");
+    setAuthStatus("Регистрация выполнена. Вы уже в своем кабинете.", "success");
     return;
   }
-  setAuthStatus("Регистрация создана. Проверьте e-mail и подтвердите аккаунт по ссылке из письма.", "success");
+  setAuthStatus("Регистрация выполнена. Подтвердите свой аккаунт по ссылке на электронной почте.", "success");
 }
 
 async function registerWithEmail(email, password, profile) {
@@ -3477,6 +3489,21 @@ function hasPasswordRecoveryUrl() {
   const isRecoveryLink = /type=recovery|auth=recovery|recovery/i.test(value);
   const hasAuthCode = /(?:[?#&])code=/.test(value);
   return isRecoveryLink || (hasAuthCode && sessionStorage.getItem("alinexa-password-recovery") === "1");
+}
+
+function hasSignupConfirmationUrl() {
+  const value = `${window.location.hash || ""}${window.location.search || ""}`;
+  const params = getRecoveryUrlParams();
+  if (!value || hasPasswordRecoveryUrl()) {
+    return false;
+  }
+  return params.get("type") === "signup" || params.has("access_token") || /(?:[?#&])code=/.test(value);
+}
+
+function clearAuthUrl() {
+  if (window.history?.replaceState) {
+    window.history.replaceState({}, document.title, APP_URL);
+  }
 }
 
 function markPasswordRecoveryRequest() {
