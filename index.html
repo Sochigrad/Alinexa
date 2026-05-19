@@ -1081,7 +1081,6 @@ textarea {
 }
 
 #authForm.is-signed-in #authEmailLabel,
-#authForm.is-signed-in #authLoginLabel,
 #authForm.is-signed-in #authNameGrid,
 #authForm.is-signed-in #authPasswordLabel,
 #authForm.is-signed-in #authPasswordRepeatLabel,
@@ -1651,10 +1650,6 @@ textarea {
           <span>E-mail</span>
           <input id="authEmailInput" type="email" autocomplete="email" required />
         </label>
-        <label id="authLoginLabel" hidden>
-          <span>Логин</span>
-          <input id="authLoginInput" type="text" autocomplete="username" maxlength="32" />
-        </label>
         <div class="auth-name-grid" id="authNameGrid" hidden>
           <label>
             <span>Имя</span>
@@ -1916,8 +1911,6 @@ const authTitle = document.querySelector("#authTitle");
 const authStatus = document.querySelector("#authStatus");
 const authEmailLabel = document.querySelector("#authEmailLabel");
 const authEmailInput = document.querySelector("#authEmailInput");
-const authLoginLabel = document.querySelector("#authLoginLabel");
-const authLoginInput = document.querySelector("#authLoginInput");
 const authNameGrid = document.querySelector("#authNameGrid");
 const authFirstNameInput = document.querySelector("#authFirstNameInput");
 const authLastNameInput = document.querySelector("#authLastNameInput");
@@ -3210,8 +3203,6 @@ function setAuthMode(mode) {
   authSheet.setAttribute("aria-label", authTitle.textContent);
   authEmailLabel.hidden = isPasswordReset;
   authEmailInput.required = !isPasswordReset;
-  authLoginLabel.hidden = !isSignUp;
-  authLoginInput.required = isSignUp;
   authNameGrid.hidden = !isSignUp;
   authFirstNameInput.required = isSignUp;
   authLastNameInput.required = isSignUp;
@@ -3231,7 +3222,7 @@ function setAuthMode(mode) {
     isPasswordReset
       ? "Введите\u00a0новый пароль и\u00a0повторите его."
       : isSignUp
-      ? "Создайте аккаунт: e-mail, логин, имя, фамилия и\u00a0пароль дважды."
+      ? "Создайте аккаунт: e-mail, имя, фамилия и\u00a0пароль дважды."
       : isSignedIn
       ? `Кабинет: ${getUserDisplayName(currentUser)}. E-mail: ${currentUser.email}.`
       : "Войдите в\u00a0аккаунт через e-mail и\u00a0пароль.",
@@ -3270,7 +3261,6 @@ async function signUpWithEmail(event) {
   }
 
   const email = authEmailInput.value.trim();
-  const login = normalizeProfileValue(authLoginInput.value, 32);
   const firstName = normalizeProfileValue(authFirstNameInput.value, 40);
   const lastName = normalizeProfileValue(authLastNameInput.value, 40);
   const password = authPasswordInput.value;
@@ -3278,12 +3268,12 @@ async function signUpWithEmail(event) {
   if (!validateAuthFields(email, password) || !validateRepeatedPassword(password, passwordRepeat)) {
     return;
   }
-  if (!validateSignUpProfile(login, firstName, lastName)) {
+  if (!validateSignUpProfile(firstName, lastName)) {
     return;
   }
 
   setAuthBusy(true);
-  const { data, error } = await registerWithEmail(email, password, { login, firstName, lastName });
+  const { data, error } = await registerWithEmail(email, password, { firstName, lastName });
   setAuthBusy(false);
   if (error) {
     setAuthStatus(`Регистрация не прошла: ${translateAuthError(error.message)}`, "error");
@@ -3296,7 +3286,6 @@ async function signUpWithEmail(event) {
   }
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
-  authLoginInput.value = "";
   authFirstNameInput.value = "";
   authLastNameInput.value = "";
   if (data?.session?.user) {
@@ -3366,13 +3355,12 @@ function isExistingUserSignup(data) {
   return Array.isArray(user.identities) && user.identities.length === 0;
 }
 
-function buildUserMetadata({ login, firstName, lastName }) {
+function buildUserMetadata({ firstName, lastName }) {
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   return {
-    login,
     first_name: firstName,
     last_name: lastName,
-    full_name: fullName || login,
+    full_name: fullName,
   };
 }
 
@@ -3380,17 +3368,7 @@ function normalizeProfileValue(value, maxLength) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
 }
 
-function validateSignUpProfile(login, firstName, lastName) {
-  if (!login) {
-    setAuthStatus("Введите логин.", "error");
-    authLoginInput.focus();
-    return false;
-  }
-  if (!/^[a-zA-Z0-9._-]{3,32}$/.test(login)) {
-    setAuthStatus("Логин должен быть от 3 символов: латиница, цифры, точка, дефис или нижнее подчеркивание.", "error");
-    authLoginInput.focus();
-    return false;
-  }
+function validateSignUpProfile(firstName, lastName) {
   if (!firstName) {
     setAuthStatus("Введите имя.", "error");
     authFirstNameInput.focus();
