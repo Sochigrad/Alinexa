@@ -654,8 +654,9 @@ body:not(.is-authenticated) .topbar {
   left: 0;
   z-index: 20;
   max-height: 92vh;
-  max-height: 92svh;
+  max-height: min(92svh, calc(var(--visual-viewport-height, 100vh) - 12px));
   overflow-y: auto;
+  scroll-padding-top: 18px;
   border-radius: 24px 24px 0 0;
   background: var(--panel);
   padding: 10px 14px calc(18px + var(--safe-bottom));
@@ -1965,6 +1966,8 @@ document.querySelector("#clearVoiceTextButton").addEventListener("click", clearV
 document.querySelector("#resetThemeButton").addEventListener("click", resetTheme);
 backgroundFileInput.addEventListener("change", uploadBackground);
 window.addEventListener("focus", syncRemoteWorkspace);
+window.visualViewport?.addEventListener("resize", updateVisualViewportHeight);
+window.visualViewport?.addEventListener("scroll", updateVisualViewportHeight);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     syncRemoteWorkspace();
@@ -2029,6 +2032,7 @@ document.querySelectorAll("[data-preset]").forEach((button) => {
 
 applyTheme(theme);
 render();
+updateVisualViewportHeight();
 initAuth();
 
 function loadBoard() {
@@ -3674,7 +3678,7 @@ function openCardSheet(cardId = null, columnId = quickColumnId) {
   updateCardReminderStatus();
   deleteCardButton.hidden = !card;
   openSheet(cardSheet);
-  cardTitleInput.focus();
+  focusFieldAtSheetStart(cardSheet, cardTitleInput);
 }
 
 function openColumnSheet(columnId = null) {
@@ -3730,8 +3734,32 @@ function openSheet(sheet) {
     item.setAttribute("aria-hidden", "true");
   });
   scrimEl.hidden = false;
+  sheet.scrollTop = 0;
   sheet.classList.add("is-open");
   sheet.setAttribute("aria-hidden", "false");
+}
+
+function updateVisualViewportHeight() {
+  const height = window.visualViewport?.height || window.innerHeight;
+  document.documentElement.style.setProperty("--visual-viewport-height", `${height}px`);
+}
+
+function focusFieldAtSheetStart(sheet, field) {
+  sheet.scrollTop = 0;
+  requestAnimationFrame(() => {
+    sheet.scrollTop = 0;
+    field.focus({ preventScroll: true });
+    keepFieldVisibleInSheet(sheet, field);
+    setTimeout(() => keepFieldVisibleInSheet(sheet, field), 280);
+  });
+}
+
+function keepFieldVisibleInSheet(sheet, field) {
+  const sheetRect = sheet.getBoundingClientRect();
+  const fieldRect = field.getBoundingClientRect();
+  if (fieldRect.top - sheetRect.top < 86 || fieldRect.bottom > sheetRect.bottom - 18) {
+    field.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
 }
 
 function closeSheets() {
