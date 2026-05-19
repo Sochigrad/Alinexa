@@ -521,6 +521,15 @@ body:not(.is-authenticated) .topbar {
   font-weight: 850;
 }
 
+.schedule-chip {
+  border-radius: 99px;
+  background: #fef3c7;
+  color: #78350f;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
 .task-card h3 {
   overflow-wrap: anywhere;
   font-size: 16px;
@@ -755,6 +764,42 @@ textarea {
 .checkbox-row input {
   width: 20px;
   height: 20px;
+}
+
+.schedule-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  padding: 12px;
+}
+
+.schedule-panel .sheet-subtitle {
+  margin: 0;
+  color: var(--accent-strong);
+}
+
+.reminder-row {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.64);
+  padding: 10px;
+}
+
+.reminder-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.reminder-status.is-success {
+  color: #166534;
+}
+
+.reminder-status.is-error {
+  color: var(--danger);
+  font-weight: 750;
 }
 
 .sheet-actions {
@@ -1420,6 +1465,24 @@ textarea {
             <option value="done">Завершено</option>
           </select>
         </label>
+        <div class="schedule-panel">
+          <h3 class="sheet-subtitle">Планирование</h3>
+          <div class="field-grid">
+            <label>
+              Дата планирования
+              <input id="cardDateInput" name="plannedDate" type="date" />
+            </label>
+            <label>
+              Время
+              <input id="cardTimeInput" name="plannedTime" type="time" />
+            </label>
+          </div>
+          <label class="checkbox-row reminder-row">
+            <input id="cardReminderInput" name="reminder" type="checkbox" />
+            <span>Напомнить на телефоне</span>
+          </label>
+          <p class="reminder-status" id="cardReminderStatus"></p>
+        </div>
         <div class="sheet-actions">
           <button class="danger-button" id="deleteCardButton" type="button">Удалить</button>
           <button class="primary-button" type="submit">Сохранить</button>
@@ -1772,6 +1835,7 @@ let currentUser = null;
 let currentSession = null;
 let remoteSaveTimer = null;
 let remoteSyncTimer = null;
+let reminderTimers = new Map();
 let remoteWorkspaceUpdatedAt = "";
 let localWorkspaceUpdatedAt = Number(localStorage.getItem(LOCAL_UPDATED_KEY) || 0);
 let isApplyingRemoteWorkspace = false;
@@ -1800,6 +1864,10 @@ const cardColumnInput = document.querySelector("#cardColumnInput");
 const cardLabelInput = document.querySelector("#cardLabelInput");
 const cardFocusInput = document.querySelector("#cardFocusInput");
 const cardStatusInput = document.querySelector("#cardStatusInput");
+const cardDateInput = document.querySelector("#cardDateInput");
+const cardTimeInput = document.querySelector("#cardTimeInput");
+const cardReminderInput = document.querySelector("#cardReminderInput");
+const cardReminderStatus = document.querySelector("#cardReminderStatus");
 const deleteCardButton = document.querySelector("#deleteCardButton");
 
 const columnSheet = document.querySelector("#columnSheet");
@@ -1916,6 +1984,14 @@ cardStatusInput.addEventListener("change", () => {
     cardFocusInput.checked = true;
   }
 });
+cardDateInput.addEventListener("input", updateCardReminderStatus);
+cardTimeInput.addEventListener("input", updateCardReminderStatus);
+cardReminderInput.addEventListener("change", async () => {
+  if (cardReminderInput.checked) {
+    await requestReminderPermission();
+  }
+  updateCardReminderStatus();
+});
 voiceFocusInput.addEventListener("change", () => {
   if (voiceFocusInput.checked && voiceStatusInput.value === "planned") {
     voiceStatusInput.value = "today";
@@ -1979,6 +2055,7 @@ function loadBoard() {
 function persist({ immediate = false } = {}) {
   markLocalWorkspaceChanged();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleCardReminders();
   hasUnsavedLocalChanges = true;
   if (immediate) {
     return saveRemoteWorkspace();
@@ -2155,6 +2232,7 @@ function render() {
   renderLabelOptions();
   renderColumnOptions();
   renderStats();
+  scheduleCardReminders();
   boardEl.innerHTML = "";
 
   state.columns.forEach((column) => {
@@ -2211,6 +2289,7 @@ function createCardElement(card) {
   button.draggable = false;
   button.dataset.cardId = card.id;
   const status = card.status || (card.focus ? "today" : "planned");
+  const scheduleText = formatCardSchedule(card);
   button.classList.add(`status-${status}`);
   button.innerHTML = `
     <h3>${escapeHtml(card.title)}</h3>
@@ -2219,6 +2298,7 @@ function createCardElement(card) {
       <div class="card-badges">
         <span class="label" style="--label-color: ${escapeHtml(getLabelColor(card.label))}">${getLabelName(card.label)}</span>
         <span class="status-chip">${statusNames[status] || statusNames.planned}</span>
+        ${scheduleText ? `<span class="schedule-chip">${escapeHtml(scheduleText)}</span>` : ""}
       </div>
       ${card.focus ? '<span class="focus-dot" aria-label="В фокусе"></span>' : ""}
     </div>
@@ -2248,6 +2328,130 @@ function createCardElement(card) {
     clearTextSelection();
   });
   return button;
+}
+
+function getCardScheduleTime(card) {
+  if (!card?.plannedDate || !card?.plannedTime) {
+    return null;
+  }
+  const value = new Date(`${card.plannedDate}T${card.plannedTime}`).getTime();
+  return Number.isFinite(value) ? value : null;
+}
+
+function formatCardSchedule(card) {
+  const time = getCardScheduleTime(card);
+  if (!time) {
+    return "";
+  }
+  const date = new Date(time);
+  const dateText = date.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "short",
+  });
+  const timeText = date.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${dateText}, ${timeText}`;
+}
+
+function scheduleCardReminders() {
+  reminderTimers.forEach((timer) => clearTimeout(timer));
+  reminderTimers.clear();
+
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    return;
+  }
+
+  const now = Date.now();
+  const maxDelay = 2147483647;
+  state.cards.forEach((card) => {
+    if (!card.reminderEnabled) {
+      return;
+    }
+    const time = getCardScheduleTime(card);
+    if (!time || time <= now) {
+      return;
+    }
+    const delay = Math.min(time - now, maxDelay);
+    const timer = setTimeout(() => {
+      if (time - Date.now() > maxDelay) {
+        scheduleCardReminders();
+        return;
+      }
+      showCardReminder(card.id);
+    }, delay);
+    reminderTimers.set(card.id, timer);
+  });
+}
+
+function showCardReminder(cardId) {
+  const card = state.cards.find((item) => item.id === cardId);
+  if (!card || !("Notification" in window) || Notification.permission !== "granted") {
+    return;
+  }
+
+  new Notification(`Alinexa: ${card.title}`, {
+    body: card.description || "Запланированная карточка",
+    tag: `alinexa-card-${card.id}`,
+  });
+}
+
+async function requestReminderPermission() {
+  if (!("Notification" in window)) {
+    return "unsupported";
+  }
+  if (Notification.permission === "default") {
+    return Notification.requestPermission();
+  }
+  return Notification.permission;
+}
+
+function updateCardReminderStatus() {
+  if (!cardReminderStatus) {
+    return;
+  }
+
+  const draftCard = {
+    plannedDate: cardDateInput.value,
+    plannedTime: cardTimeInput.value,
+  };
+  const hasSchedule = Boolean(draftCard.plannedDate && draftCard.plannedTime);
+  const scheduleText = formatCardSchedule(draftCard);
+  const isReminderOn = cardReminderInput.checked;
+  cardReminderStatus.classList.remove("is-error", "is-success");
+
+  if (isReminderOn && !hasSchedule) {
+    cardReminderStatus.textContent = "Выберите дату и время, чтобы включить напоминание.";
+    cardReminderStatus.classList.add("is-error");
+    return;
+  }
+
+  if (!("Notification" in window)) {
+    cardReminderStatus.textContent = "Этот браузер не поддерживает уведомления. Дата и время сохранятся в карточке.";
+    cardReminderStatus.classList.add(isReminderOn ? "is-error" : "is-success");
+    return;
+  }
+
+  if (isReminderOn && Notification.permission === "denied") {
+    cardReminderStatus.textContent = "Уведомления запрещены в браузере. Разрешите их в настройках сайта.";
+    cardReminderStatus.classList.add("is-error");
+    return;
+  }
+
+  if (scheduleText && isReminderOn) {
+    cardReminderStatus.textContent = `Напоминание включено: ${scheduleText}.`;
+    cardReminderStatus.classList.add("is-success");
+    return;
+  }
+
+  if (scheduleText) {
+    cardReminderStatus.textContent = `Запланировано: ${scheduleText}.`;
+    cardReminderStatus.classList.add("is-success");
+    return;
+  }
+
+  cardReminderStatus.textContent = "Можно указать дату, время и включить напоминание.";
 }
 
 function prepareTouchDrag(event, cardEl, cardId) {
@@ -3385,6 +3589,10 @@ function openCardSheet(cardId = null, columnId = quickColumnId) {
   cardLabelInput.value = card?.label || labels[0]?.id || "product";
   cardFocusInput.checked = Boolean(card?.focus);
   cardStatusInput.value = card?.status || (card?.focus ? "today" : "planned");
+  cardDateInput.value = card?.plannedDate || "";
+  cardTimeInput.value = card?.plannedTime || "";
+  cardReminderInput.checked = Boolean(card?.reminderEnabled);
+  updateCardReminderStatus();
   deleteCardButton.hidden = !card;
   openSheet(cardSheet);
   cardTitleInput.focus();
@@ -3458,8 +3666,9 @@ function closeSheets() {
   activeColumnId = null;
 }
 
-function saveCard(event) {
+async function saveCard(event) {
   event.preventDefault();
+  const reminderEnabled = cardReminderInput.checked;
   const payload = {
     title: cardTitleInput.value.trim(),
     description: cardDescriptionInput.value.trim(),
@@ -3467,10 +3676,31 @@ function saveCard(event) {
     label: cardLabelInput.value,
     focus: cardFocusInput.checked,
     status: cardStatusInput.value,
+    plannedDate: cardDateInput.value,
+    plannedTime: cardTimeInput.value,
+    reminderEnabled,
   };
 
   if (!payload.title) {
     return;
+  }
+
+  if (reminderEnabled && (!payload.plannedDate || !payload.plannedTime)) {
+    cardReminderStatus.textContent = "Выберите дату и время, чтобы включить напоминание.";
+    cardReminderStatus.classList.add("is-error");
+    return;
+  }
+
+  if (reminderEnabled) {
+    const permission = await requestReminderPermission();
+    if (permission === "denied") {
+      cardReminderStatus.textContent = "Уведомления запрещены в браузере. Разрешите их в настройках сайта.";
+      cardReminderStatus.classList.add("is-error");
+      return;
+    }
+    if (permission === "unsupported") {
+      payload.reminderEnabled = false;
+    }
   }
 
   if (activeCardId) {
