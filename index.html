@@ -50,6 +50,17 @@ body {
   overflow-x: hidden;
 }
 
+body:not(.is-authenticated) {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(20, 184, 166, 0.18), transparent 26rem),
+    radial-gradient(circle at 86% 18%, rgba(148, 163, 184, 0.2), transparent 24rem),
+    linear-gradient(145deg, #f8fafc, #eef2f7);
+  background-attachment: fixed;
+  background-position: center;
+  background-size: cover;
+  color: #111827;
+}
+
 body.is-card-dragging,
 body.is-card-dragging * {
   cursor: grabbing;
@@ -170,6 +181,14 @@ body:not(.is-authenticated) .topbar {
 }
 
 .welcome-screen {
+  --accent: #0f766e;
+  --accent-strong: #115e59;
+  --accent-soft: rgba(15, 118, 110, 0.16);
+  --ink: #111827;
+  --muted: #667085;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --line: #d7dde8;
   display: grid;
   align-content: center;
   justify-items: center;
