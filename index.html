@@ -25,6 +25,7 @@
   --danger: #c2410c;
   --shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --sheet-mobile-top: max(6px, env(safe-area-inset-top, 0px));
 }
 
 * {
@@ -1240,6 +1241,18 @@ textarea {
 }
 
 @media (min-width: 760px) {
+  body.is-authenticated {
+    height: 100vh;
+    height: 100svh;
+    overflow: hidden;
+  }
+
+  body.is-authenticated .app-shell {
+    height: 100vh;
+    height: 100svh;
+    min-height: 0;
+  }
+
   .app-shell {
     max-width: 1180px;
     margin: 0 auto;
@@ -1304,17 +1317,19 @@ textarea {
     grid-auto-flow: column;
     overflow-x: auto;
     overflow-y: hidden;
+    height: calc(100vh - 260px);
+    height: calc(100svh - 260px);
     padding-right: 18px;
     padding-left: 18px;
-    padding-bottom: 112px;
+    padding-bottom: 18px;
     scroll-padding-inline: 18px;
     scroll-snap-type: x proximity;
   }
 
   .column {
     grid-template-rows: auto 1fr;
-    height: calc(100vh - 246px);
-    max-height: calc(100vh - 246px);
+    height: 100%;
+    max-height: none;
     min-height: 0;
     scroll-snap-align: start;
   }
@@ -1367,22 +1382,22 @@ textarea {
 
 @media (min-width: 1040px) {
   .app-shell {
-    max-width: 1440px;
+    max-width: none;
   }
 
   .board {
-    grid-auto-columns: clamp(300px, 23vw, 360px);
+    grid-auto-columns: clamp(236px, calc((100vw - 120px) / 5), 330px);
     padding-right: 18px;
   }
 
   .column {
-    max-height: calc(100vh - 246px);
+    max-height: none;
   }
 }
 
 @media (min-width: 1320px) {
   .board {
-    grid-auto-columns: clamp(312px, 22vw, 368px);
+    grid-auto-columns: clamp(248px, calc((100vw - 132px) / 5), 330px);
   }
 }
 
@@ -1431,14 +1446,15 @@ textarea {
   }
 
   .sheet,
-  .sheet.compact {
-    top: auto;
+  .sheet.compact,
+  #authSheet.compact {
+    top: var(--sheet-mobile-top);
     right: 0;
-    bottom: 0;
+    bottom: auto;
     left: 0;
     width: auto;
-    height: 96svh;
-    max-height: 96svh;
+    height: calc(var(--visual-viewport-height, 100vh) - var(--sheet-mobile-top));
+    max-height: calc(var(--visual-viewport-height, 100vh) - var(--sheet-mobile-top));
     border-radius: 20px 20px 0 0;
     padding: 8px 14px calc(16px + var(--safe-bottom));
     opacity: 1;
