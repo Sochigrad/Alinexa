@@ -1995,6 +1995,7 @@ let hasUnsavedLocalChanges = false;
 let hasLoadedRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
 let isSigningOut = false;
+let serviceWorkerReadyPromise = null;
 let recognition = null;
 let recognitionTarget = null;
 let isRecording = false;
@@ -2187,6 +2188,7 @@ document.querySelectorAll("[data-preset]").forEach((button) => {
 applyTheme(theme);
 render();
 updateVisualViewportHeight();
+initServiceWorker();
 initAuth();
 
 function loadBoard() {
@@ -2593,16 +2595,40 @@ function scheduleCardReminders() {
   });
 }
 
-function showCardReminder(cardId) {
+async function showCardReminder(cardId) {
   const card = state.cards.find((item) => item.id === cardId);
   if (!card || !("Notification" in window) || Notification.permission !== "granted") {
     return;
   }
 
-  new Notification(`Alinexa: ${card.title}`, {
+  const notification = {
     body: card.description || "Запланированная карточка",
     tag: `alinexa-card-${card.id}`,
-  });
+    data: { url: APP_URL },
+  };
+
+  try {
+    const registration = serviceWorkerReadyPromise ? await serviceWorkerReadyPromise : null;
+    if (registration?.showNotification) {
+      await registration.showNotification(`Alinexa: ${card.title}`, notification);
+      return;
+    }
+  } catch {
+    // If service worker is unavailable, fall back to the regular Notification API.
+  }
+
+  new Notification(`Alinexa: ${card.title}`, notification);
+}
+
+function initServiceWorker() {
+  if (!("serviceWorker" in navigator) || location.protocol !== "https:") {
+    return;
+  }
+
+  serviceWorkerReadyPromise = navigator.serviceWorker
+    .register("/service-worker.js")
+    .then(() => navigator.serviceWorker.ready)
+    .catch(() => null);
 }
 
 async function requestReminderPermission() {
