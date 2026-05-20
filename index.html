@@ -2728,6 +2728,14 @@ async function ensurePushSubscription() {
   return "subscribed";
 }
 
+function withTimeout(promise, timeoutMs, fallbackValue) {
+  let timeoutId;
+  const timeout = new Promise((resolve) => {
+    timeoutId = setTimeout(() => resolve(fallbackValue), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
 async function savePushSubscription(subscription) {
   const token = await getAccessToken();
   if (!token || !currentUser || !subscription) {
@@ -4112,19 +4120,11 @@ async function saveCard(event) {
   if (reminderEnabled) {
     let permission = "default";
     try {
-      permission = await ensurePushSubscription();
+      permission = await withTimeout(ensurePushSubscription(), 3500, "timeout");
     } catch (error) {
-      cardReminderStatus.textContent =
-        "Не удалось сохранить push-подписку. Проверьте, что таблица уведомлений создана в Supabase.";
-      cardReminderStatus.classList.add("is-error");
-      return;
+      permission = "failed";
     }
-    if (permission === "denied") {
-      cardReminderStatus.textContent = "Уведомления запрещены в браузере. Разрешите их в настройках сайта.";
-      cardReminderStatus.classList.add("is-error");
-      return;
-    }
-    if (permission === "unsupported") {
+    if (["denied", "unsupported", "no-user", "timeout", "failed"].includes(permission)) {
       payload.reminderEnabled = false;
     }
   }
