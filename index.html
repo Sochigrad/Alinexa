@@ -2141,8 +2141,24 @@ cardStatusInput.addEventListener("change", () => {
     cardFocusInput.checked = true;
   }
 });
+function openNativePicker(input) {
+  if (!input) {
+    return;
+  }
+
+  try {
+    input.showPicker?.();
+  } catch {
+    input.focus();
+  }
+}
+
 cardDateInput.addEventListener("input", updateCardReminderStatus);
 cardTimeInput.addEventListener("input", updateCardReminderStatus);
+cardDateInput.addEventListener("click", () => openNativePicker(cardDateInput));
+cardTimeInput.addEventListener("click", () => openNativePicker(cardTimeInput));
+cardDateInput.addEventListener("touchend", () => openNativePicker(cardDateInput), { passive: true });
+cardTimeInput.addEventListener("touchend", () => openNativePicker(cardTimeInput), { passive: true });
 cardReminderInput.addEventListener("change", async () => {
   if (cardReminderInput.checked) {
     try {
@@ -2616,6 +2632,11 @@ async function showCardReminder(cardId) {
   const notification = {
     body: card.description || "Запланированная карточка",
     tag: `alinexa-card-${card.id}`,
+    renotify: true,
+    requireInteraction: true,
+    silent: false,
+    timestamp: Date.now(),
+    vibrate: [240, 80, 240],
     data: { url: APP_URL },
   };
 
@@ -2639,8 +2660,20 @@ function initServiceWorker() {
 
   serviceWorkerReadyPromise = navigator.serviceWorker
     .register("/service-worker.js")
-    .then(() => navigator.serviceWorker.ready)
+    .then((registration) => {
+      registration.update?.();
+      return navigator.serviceWorker.ready;
+    })
     .catch(() => null);
+}
+
+function isIosStandaloneRequired() {
+  const isIos =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isStandalone =
+    window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+  return isIos && !isStandalone;
 }
 
 async function requestReminderPermission() {
@@ -2753,8 +2786,9 @@ function updateCardReminderStatus() {
   }
 
   if (isReminderOn && (!("serviceWorker" in navigator) || !("PushManager" in window))) {
-    cardReminderStatus.textContent =
-      "Браузер не поддерживает push-уведомления. Напоминание сработает только при открытой странице.";
+    cardReminderStatus.textContent = isIosStandaloneRequired()
+      ? "На iPhone уведомления приходят после добавления Alinexa на экран «Домой» и открытия через иконку приложения."
+      : "Браузер не поддерживает push-уведомления. Напоминание сработает только при открытой странице.";
     cardReminderStatus.classList.add("is-error");
     return;
   }
