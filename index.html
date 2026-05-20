@@ -115,7 +115,7 @@ body:not(.is-authenticated) .topbar {
 
 .topbar {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   padding: 14px 14px 8px;
@@ -144,8 +144,7 @@ body:not(.is-authenticated) .topbar {
 
 .account-name {
   display: inline-flex;
-  max-width: 100%;
-  margin-top: 6px;
+  max-width: min(44vw, 260px);
   padding: 5px 8px;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
   border-radius: 8px;
@@ -155,6 +154,13 @@ body:not(.is-authenticated) .topbar {
   font-weight: 850;
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+.account-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .icon-button,
@@ -688,6 +694,34 @@ body:not(.is-authenticated) .topbar {
   color: var(--accent-strong);
 }
 
+.search-action-icon {
+  position: relative;
+}
+
+.search-action-icon::before,
+.search-action-icon::after {
+  content: "";
+  position: absolute;
+  display: block;
+}
+
+.search-action-icon::before {
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  transform: translate(-2px, -2px);
+}
+
+.search-action-icon::after {
+  width: 8px;
+  height: 2px;
+  border-radius: 99px;
+  background: currentColor;
+  transform: translate(6px, 7px) rotate(45deg);
+  transform-origin: left center;
+}
+
 .scrim {
   position: fixed;
   inset: 0;
@@ -1211,7 +1245,28 @@ textarea {
   }
 
   .topbar {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
     padding-top: 24px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .brand p {
+    font-size: 13px;
+  }
+
+  .brand h1 {
+    font-size: 30px;
+  }
+
+  .account-name {
+    max-width: 280px;
+    margin-right: 2px;
+    white-space: nowrap;
   }
 
   .welcome-screen {
@@ -1286,13 +1341,21 @@ textarea {
   .sheet {
     right: 50%;
     left: auto;
+    top: 50%;
+    bottom: auto;
     width: 520px;
-    border-radius: 24px 24px 0 0;
-    transform: translate(50%, 106%);
+    max-height: min(86vh, 820px);
+    max-height: min(86svh, 820px);
+    border-radius: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(50%, calc(-50% + 28px));
   }
 
   .sheet.is-open {
-    transform: translate(50%, 0);
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(50%, -50%);
   }
 }
 
@@ -1363,13 +1426,17 @@ textarea {
 
   .sheet,
   .sheet.compact {
+    top: auto;
     right: 0;
+    bottom: 0;
     left: 0;
     width: auto;
     height: 96svh;
     max-height: 96svh;
     border-radius: 20px 20px 0 0;
     padding: 8px 14px calc(16px + var(--safe-bottom));
+    opacity: 1;
+    pointer-events: auto;
     transform: translateY(106%);
   }
 
@@ -1432,9 +1499,11 @@ textarea {
         <div class="brand">
           <p>Мобильная доска</p>
           <h1 id="boardTitle">Alinexa</h1>
-          <span class="account-name" id="accountName" hidden></span>
         </div>
-        <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт">IN</button>
+        <div class="account-cluster">
+          <span class="account-name" id="accountName" hidden></span>
+          <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт">IN</button>
+        </div>
       </header>
 
       <section class="welcome-screen" id="welcomeScreen" aria-label="Старт Alinexa">
@@ -1482,7 +1551,7 @@ textarea {
           <span>Колонка</span>
         </button>
         <button class="bottom-action" id="searchButton" type="button">
-          <span class="action-icon">⌕</span>
+          <span class="action-icon search-action-icon" aria-hidden="true"></span>
           <span>Поиск</span>
         </button>
         <button class="bottom-action" id="themeButton" type="button">
@@ -1551,7 +1620,7 @@ textarea {
           <h3 class="sheet-subtitle">Планирование</h3>
           <div class="field-grid">
             <label>
-              Дата выполнения
+              Дата
               <input id="cardDateInput" name="plannedDate" type="date" />
             </label>
             <label>
