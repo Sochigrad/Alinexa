@@ -1984,6 +1984,9 @@ let quickColumnId = state.columns[0]?.id || "";
 let longPressTimer = null;
 let pendingTouch = null;
 let touchDrag = null;
+const TOUCH_LONG_PRESS_MS = 340;
+const TOUCH_SCROLL_CANCEL_PX = 10;
+const TOUCH_MOUSE_DRAG_PX = 4;
 let suppressClickUntil = 0;
 let autoScrollFrame = null;
 let autoScrollState = { horizontal: 0, vertical: 0, list: null };
@@ -2830,42 +2833,54 @@ function prepareTouchDrag(event, cardEl, cardId) {
     return;
   }
 
-  if (event.pointerType !== "mouse") {
-    event.preventDefault();
-  }
   clearTimeout(longPressTimer);
   const rect = cardEl.getBoundingClientRect();
   pendingTouch = {
     cardId,
     cardEl,
     pointerId: event.pointerId,
+    pointerType: event.pointerType,
     startX: event.clientX,
     startY: event.clientY,
+    lastX: event.clientX,
+    lastY: event.clientY,
     offsetX: event.clientX - rect.left,
     offsetY: event.clientY - rect.top,
     width: rect.width,
   };
 
-  try {
-    cardEl.setPointerCapture(event.pointerId);
-  } catch {
-    // Pointer capture is best effort on mobile browsers.
+  if (event.pointerType === "mouse") {
+    try {
+      cardEl.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture is best effort on mobile browsers.
+    }
   }
 
   if (event.pointerType !== "mouse") {
     longPressTimer = setTimeout(() => {
-      startTouchDrag(event);
-    }, 70);
+      if (pendingTouch?.pointerId === event.pointerId) {
+        startTouchDrag();
+      }
+    }, TOUCH_LONG_PRESS_MS);
   }
 }
 
 function moveTouchDrag(event) {
   if (!touchDrag) {
     if (pendingTouch) {
+      pendingTouch.lastX = event.clientX;
+      pendingTouch.lastY = event.clientY;
       const distance = Math.hypot(event.clientX - pendingTouch.startX, event.clientY - pendingTouch.startY);
-      if (distance > 4) {
+      if (pendingTouch.pointerType === "mouse" && distance > TOUCH_MOUSE_DRAG_PX) {
         startTouchDrag(event);
         moveTouchDrag(event);
+        return;
+      }
+
+      if (pendingTouch.pointerType !== "mouse" && distance > TOUCH_SCROLL_CANCEL_PX) {
+        clearTimeout(longPressTimer);
+        pendingTouch = null;
       }
     }
     return;
@@ -2880,7 +2895,7 @@ function moveTouchDrag(event) {
   }
 }
 
-function startTouchDrag(event) {
+function startTouchDrag(event = null) {
   if (!pendingTouch || touchDrag) {
     return;
   }
@@ -2888,14 +2903,16 @@ function startTouchDrag(event) {
   clearTimeout(longPressTimer);
   clearTextSelection();
   const { cardEl, cardId, offsetX, offsetY, pointerId, width } = pendingTouch;
+  const clientX = event?.clientX ?? pendingTouch.lastX ?? pendingTouch.startX;
+  const clientY = event?.clientY ?? pendingTouch.lastY ?? pendingTouch.startY;
   touchDrag = {
     cardId,
     cardEl,
-    originLeft: event.clientX - offsetX,
-    originTop: event.clientY - offsetY,
-    startX: event.clientX,
-    clientX: event.clientX,
-    clientY: event.clientY,
+    originLeft: clientX - offsetX,
+    originTop: clientY - offsetY,
+    startX: clientX,
+    clientX,
+    clientY,
     currentList: null,
     marker: createDropMarker(cardEl),
     offsetX,
@@ -2916,8 +2933,8 @@ function startTouchDrag(event) {
   document.body.classList.add("is-card-dragging");
   document.body.style.overflow = "hidden";
   cardEl.style.width = `${width}px`;
-  cardEl.style.left = `${event.clientX - offsetX}px`;
-  cardEl.style.top = `${event.clientY - offsetY}px`;
+  cardEl.style.left = `${clientX - offsetX}px`;
+  cardEl.style.top = `${clientY - offsetY}px`;
   cardEl.style.transform = "translate3d(0, 0, 0) rotate(1deg) scale(1.02)";
   suppressClickUntil = Date.now() + 650;
 }
