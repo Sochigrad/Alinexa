@@ -2001,7 +2001,7 @@ let longPressTimer = null;
 let pendingTouch = null;
 let touchDrag = null;
 const TOUCH_LONG_PRESS_MS = 340;
-const TOUCH_SCROLL_CANCEL_PX = 10;
+const TOUCH_SCROLL_CANCEL_PX = 18;
 const TOUCH_MOUSE_DRAG_PX = 4;
 let suppressClickUntil = 0;
 let autoScrollFrame = null;
@@ -2127,6 +2127,9 @@ accountButton.addEventListener("click", openAuthSheet);
 welcomeSignUpButton?.addEventListener("click", openRegistrationSheet);
 welcomeSignInButton?.addEventListener("click", openAuthSheet);
 scrimEl.addEventListener("click", closeSheets);
+document.addEventListener("pointermove", moveTouchDrag, { passive: false });
+document.addEventListener("pointerup", finishTouchDrag, { passive: false });
+document.addEventListener("pointercancel", cancelTouchDrag);
 
 cardForm.addEventListener("submit", saveCard);
 columnForm.addEventListener("submit", saveColumn);
@@ -2571,9 +2574,6 @@ function createCardElement(card) {
     openCardSheet(card.id);
   });
   button.addEventListener("pointerdown", (event) => prepareTouchDrag(event, button, card.id));
-  button.addEventListener("pointermove", moveTouchDrag);
-  button.addEventListener("pointerup", finishTouchDrag);
-  button.addEventListener("pointercancel", cancelTouchDrag);
   button.addEventListener("dragstart", (event) => {
     clearTextSelection();
     event.dataTransfer.setData("text/plain", card.id);
@@ -2887,14 +2887,21 @@ function moveTouchDrag(event) {
     if (pendingTouch) {
       pendingTouch.lastX = event.clientX;
       pendingTouch.lastY = event.clientY;
-      const distance = Math.hypot(event.clientX - pendingTouch.startX, event.clientY - pendingTouch.startY);
+      const deltaX = event.clientX - pendingTouch.startX;
+      const deltaY = event.clientY - pendingTouch.startY;
+      const distance = Math.hypot(deltaX, deltaY);
       if (pendingTouch.pointerType === "mouse" && distance > TOUCH_MOUSE_DRAG_PX) {
         startTouchDrag(event);
         moveTouchDrag(event);
         return;
       }
 
-      if (pendingTouch.pointerType !== "mouse" && distance > TOUCH_SCROLL_CANCEL_PX) {
+      const isIntentionalScroll =
+        pendingTouch.pointerType !== "mouse" &&
+        distance > TOUCH_SCROLL_CANCEL_PX &&
+        Math.abs(deltaY) > Math.abs(deltaX) * 1.15;
+
+      if (isIntentionalScroll) {
         clearTimeout(longPressTimer);
         pendingTouch = null;
       }
