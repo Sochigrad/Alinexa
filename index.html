@@ -1511,7 +1511,7 @@ textarea {
         </label>
         <button class="voice-inline-button" id="dictateDescriptionButton" type="button">
           <span>●</span>
-          <strong>Надиктовать описание</strong>
+          <strong>Надиктовать задачу</strong>
         </button>
         <div class="field-grid">
           <label>
@@ -1547,7 +1547,7 @@ textarea {
           <h3 class="sheet-subtitle">Планирование</h3>
           <div class="field-grid">
             <label>
-              Дата планирования
+              Дата выполнения
               <input id="cardDateInput" name="plannedDate" type="date" />
             </label>
             <label>
@@ -3985,13 +3985,13 @@ async function saveVoiceCard(event) {
     return;
   }
 
-  const title = createTitleFromVoice(text);
+  const voiceTask = splitVoiceTaskText(text);
   const createdAt = Date.now();
   state.cards.push({
     id: crypto.randomUUID(),
     columnId: voiceColumnInput.value,
-    title,
-    description: text,
+    title: voiceTask.title,
+    description: voiceTask.description,
     label: voiceLabelInput.value,
     focus: voiceFocusInput.checked,
     status: voiceStatusInput.value,
@@ -4289,7 +4289,10 @@ function startRecognition(target) {
 
   stopRecognition();
   recognitionTarget = target;
-  committedVoiceText = target === "description" ? cardDescriptionInput.value.trim() : voiceTextInput.value.trim();
+  committedVoiceText =
+    target === "description"
+      ? [cardTitleInput.value.trim(), cardDescriptionInput.value.trim()].filter(Boolean).join(" ")
+      : voiceTextInput.value.trim();
   recognition = new SpeechRecognition();
   recognition.lang = "ru-RU";
   recognition.continuous = true;
@@ -4356,12 +4359,12 @@ function setRecordingUi(recording, target) {
   recordVoiceButton.setAttribute("aria-pressed", String(recording && target === "voice-card"));
   dictateDescriptionButton.classList.toggle("is-recording", recording && target === "description");
   dictateDescriptionButton.querySelector("strong").textContent =
-    recording && target === "description" ? "Остановить диктовку" : "Надиктовать описание";
+    recording && target === "description" ? "Остановить диктовку" : "Надиктовать задачу";
 }
 
 function writeVoiceText(target, text) {
   if (target === "description") {
-    cardDescriptionInput.value = text.slice(0, cardDescriptionInput.maxLength || 260);
+    writeDictatedTaskToCardForm(text);
     return;
   }
   voiceTextInput.value = text.slice(0, voiceTextInput.maxLength || 900);
@@ -4383,9 +4386,47 @@ function clearVoiceText() {
 }
 
 function createTitleFromVoice(text) {
-  const words = text.replace(/\s+/g, " ").trim().split(" ");
-  const title = words.slice(0, 7).join(" ");
-  return title.length > 72 ? `${title.slice(0, 69)}...` : title;
+  return splitVoiceTaskText(text).title;
+}
+
+function splitVoiceTaskText(text) {
+  const cleanText = text.replace(/\s+/g, " ").trim();
+  if (!cleanText) {
+    return { title: "", description: "" };
+  }
+
+  const titleLimit = 80;
+  const descriptionLimit = Number(cardDescriptionInput?.maxLength) || 260;
+  if (cleanText.length <= titleLimit) {
+    return { title: cleanText, description: "" };
+  }
+
+  const words = cleanText.split(" ");
+  const titleWords = [];
+  let titleLength = 0;
+
+  for (const word of words) {
+    const nextLength = titleLength + word.length + (titleWords.length ? 1 : 0);
+    if (titleWords.length >= 10 || nextLength > titleLimit) {
+      break;
+    }
+    titleWords.push(word);
+    titleLength = nextLength;
+  }
+
+  const title = titleWords.join(" ") || cleanText.slice(0, titleLimit).trim();
+  const description = cleanText.slice(title.length).trim();
+
+  return {
+    title,
+    description: description.slice(0, descriptionLimit),
+  };
+}
+
+function writeDictatedTaskToCardForm(text) {
+  const task = splitVoiceTaskText(text);
+  cardTitleInput.value = task.title.slice(0, cardTitleInput.maxLength || 80);
+  cardDescriptionInput.value = task.description.slice(0, cardDescriptionInput.maxLength || 260);
 }
 
 function renderSearch() {
