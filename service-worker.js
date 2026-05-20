@@ -21,6 +21,11 @@ self.addEventListener("push", (event) => {
   const options = {
     body: payload.body || "Напоминание по задаче",
     tag: payload.tag || "alinexa-reminder",
+    renotify: true,
+    requireInteraction: true,
+    silent: false,
+    timestamp: Date.now(),
+    vibrate: [240, 80, 240],
     data: {
       url: payload.url || "/",
     },
