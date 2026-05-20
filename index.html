@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <style>
@@ -1841,6 +1843,9 @@ const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
 const APP_URL = "https://alinexa.ru/";
+const PUSH_SUBSCRIPTIONS_TABLE = "alinexa_push_subscriptions";
+const VAPID_PUBLIC_KEY =
+  "BBZsesectlp8qreP1O5lFR62o1LQRUAOd-T44sU3wpR3JhFKyv2hQyHK3XPG-7fOdaj-CO4Rze9TkEwWdkr_A5U";
 
 const defaultTheme = {
   accent: "#0f766e",
@@ -2140,7 +2145,14 @@ cardDateInput.addEventListener("input", updateCardReminderStatus);
 cardTimeInput.addEventListener("input", updateCardReminderStatus);
 cardReminderInput.addEventListener("change", async () => {
   if (cardReminderInput.checked) {
-    await requestReminderPermission();
+    try {
+      await ensurePushSubscription();
+    } catch {
+      cardReminderStatus.textContent =
+        "Не удалось подключить push-уведомления. Проверьте таблицу уведомлений в Supabase.";
+      cardReminderStatus.classList.add("is-error");
+      return;
+    }
   }
   updateCardReminderStatus();
 });
@@ -2641,6 +2653,79 @@ async function requestReminderPermission() {
   return Notification.permission;
 }
 
+function urlBase64ToUint8Array(value) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let index = 0; index < raw.length; index += 1) {
+    output[index] = raw.charCodeAt(index);
+  }
+  return output;
+}
+
+async function ensurePushSubscription() {
+  const permission = await requestReminderPermission();
+  if (permission !== "granted") {
+    return permission;
+  }
+
+  if (!currentUser || !supabaseClient) {
+    return "no-user";
+  }
+
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return "unsupported";
+  }
+
+  const registration = serviceWorkerReadyPromise ? await serviceWorkerReadyPromise : null;
+  if (!registration?.pushManager) {
+    return "unsupported";
+  }
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+  }
+
+  await savePushSubscription(subscription);
+  return "subscribed";
+}
+
+async function savePushSubscription(subscription) {
+  const token = await getAccessToken();
+  if (!token || !currentUser || !subscription) {
+    return;
+  }
+
+  const body = {
+    user_id: currentUser.id,
+    endpoint: subscription.endpoint,
+    subscription: subscription.toJSON(),
+    user_agent: navigator.userAgent,
+    updated_at: new Date().toISOString(),
+  };
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${PUSH_SUBSCRIPTIONS_TABLE}?on_conflict=endpoint`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.message || errorBody?.msg || `Supabase ${response.status}`);
+  }
+}
+
 function updateCardReminderStatus() {
   if (!cardReminderStatus) {
     return;
@@ -2667,6 +2752,13 @@ function updateCardReminderStatus() {
     return;
   }
 
+  if (isReminderOn && (!("serviceWorker" in navigator) || !("PushManager" in window))) {
+    cardReminderStatus.textContent =
+      "Браузер не поддерживает push-уведомления. Напоминание сработает только при открытой странице.";
+    cardReminderStatus.classList.add("is-error");
+    return;
+  }
+
   if (isReminderOn && Notification.permission === "denied") {
     cardReminderStatus.textContent = "Уведомления запрещены в браузере. Разрешите их в настройках сайта.";
     cardReminderStatus.classList.add("is-error");
@@ -2674,7 +2766,7 @@ function updateCardReminderStatus() {
   }
 
   if (scheduleText && isReminderOn) {
-    cardReminderStatus.textContent = `Напоминание включено: ${scheduleText}.`;
+    cardReminderStatus.textContent = `Напоминание включено: ${scheduleText}. Уведомление придет на это устройство.`;
     cardReminderStatus.classList.add("is-success");
     return;
   }
@@ -3984,7 +4076,15 @@ async function saveCard(event) {
   }
 
   if (reminderEnabled) {
-    const permission = await requestReminderPermission();
+    let permission = "default";
+    try {
+      permission = await ensurePushSubscription();
+    } catch (error) {
+      cardReminderStatus.textContent =
+        "Не удалось сохранить push-подписку. Проверьте, что таблица уведомлений создана в Supabase.";
+      cardReminderStatus.classList.add("is-error");
+      return;
+    }
     if (permission === "denied") {
       cardReminderStatus.textContent = "Уведомления запрещены в браузере. Разрешите их в настройках сайта.";
       cardReminderStatus.classList.add("is-error");
