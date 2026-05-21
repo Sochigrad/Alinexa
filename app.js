@@ -3,6 +3,7 @@ const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
+const APP_BUILD_ID = "20260521-auth-recovery-2";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -314,6 +315,11 @@ function bindReliableTap(button, handler) {
       run(event);
     }
   });
+  button.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      run(event);
+    }
+  });
 }
 
 bindActionButton("#menuButton", openSearchSheet);
@@ -353,6 +359,11 @@ themeForm.addEventListener("submit", saveTheme);
 voiceForm.addEventListener("submit", saveVoiceCard);
 labelsForm.addEventListener("submit", saveLabels);
 authForm.addEventListener("submit", handleAuthSubmit);
+authForm.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && event.target?.tagName !== "TEXTAREA") {
+    handleAuthSubmit(event);
+  }
+});
 deleteCardButton.addEventListener("click", deleteActiveCard);
 deleteColumnButton.addEventListener("click", deleteActiveColumn);
 searchInput.addEventListener("input", renderSearch);
@@ -431,8 +442,8 @@ signUpButton.addEventListener("pointerup", (event) => {
     toggleAuthMode();
   }
 });
-resetPasswordButton.addEventListener("click", sendPasswordResetEmail);
-signOutButton.addEventListener("click", signOut);
+bindReliableTap(resetPasswordButton, sendPasswordResetEmail);
+bindReliableTap(signOutButton, signOut);
 signOutButton.addEventListener("pointerdown", (event) => {
   event.stopPropagation();
 });
@@ -447,7 +458,10 @@ applyTheme(theme);
 render();
 updateVisualViewportHeight();
 initServiceWorker();
-initAuth();
+initAuth().catch(() => {
+  updateAuthUi(null);
+  setAuthStatus("Не удалось запустить вход. Обновите страницу и попробуйте еще раз.", "error");
+});
 
 function loadBoard() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -957,13 +971,33 @@ function initServiceWorker() {
     return;
   }
 
-  serviceWorkerReadyPromise = navigator.serviceWorker
-    .register("/service-worker.js")
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (sessionStorage.getItem("alinexa-sw-refreshed") === APP_BUILD_ID) {
+      return;
+    }
+    sessionStorage.setItem("alinexa-sw-refreshed", APP_BUILD_ID);
+    window.location.reload();
+  });
+
+  serviceWorkerReadyPromise = flushOldAppCaches()
+    .then(() => navigator.serviceWorker.register(`/service-worker.js?v=${APP_BUILD_ID}`))
     .then((registration) => {
       registration.update?.();
       return navigator.serviceWorker.ready;
     })
     .catch(() => null);
+}
+
+async function flushOldAppCaches() {
+  if (!("caches" in window)) {
+    return;
+  }
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+  } catch {
+    // Cache cleanup is best-effort; auth must continue even if a browser blocks it.
+  }
 }
 
 function isIosStandaloneRequired() {
@@ -1202,7 +1236,8 @@ function moveTouchDrag(event) {
     return;
   }
 
-  event.preventDefault();
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
   touchDrag.clientX = event.clientX;
   touchDrag.clientY = event.clientY;
 
@@ -1801,6 +1836,9 @@ async function initAuth() {
 }
 
 async function getSupabaseClient() {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return null;
   }
@@ -1808,13 +1846,14 @@ async function getSupabaseClient() {
   if (!hasLibrary || !window.supabase?.createClient) {
     return null;
   }
-  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
   });
+  return supabaseClient;
 }
 
 async function ensureSupabaseLibrary() {
@@ -1823,7 +1862,7 @@ async function ensureSupabaseLibrary() {
   }
   if (!supabaseLoadPromise) {
     supabaseLoadPromise = (async () => {
-      await waitForSupabaseGlobal(1200);
+      await waitForSupabaseGlobal(2500);
       if (window.supabase?.createClient) {
         return true;
       }
@@ -2139,6 +2178,8 @@ function openRegistrationSheet() {
 }
 
 function handleAuthSubmit(event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
   if (authMode === "sign-up") {
     return signUpWithEmail(event);
   }
@@ -2192,7 +2233,8 @@ function setAuthMode(mode) {
 }
 
 async function signInWithEmail(event) {
-  event.preventDefault();
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
   if (!(await ensureAuthReady())) {
     return;
   }
@@ -2204,11 +2246,19 @@ async function signInWithEmail(event) {
   }
 
   setAuthBusy(true);
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   setAuthBusy(false);
   if (error) {
     setAuthStatus(`Войти не получилось: ${translateAuthError(error.message)}`, "error");
     return;
+  }
+  currentSession = data?.session || null;
+  currentUser = data?.user || data?.session?.user || null;
+  if (currentUser) {
+    updateAuthUi(currentUser);
+    await loadRemoteWorkspace({ mergeLocalData: false });
+    hasLoadedRemoteWorkspace = true;
+    startRemoteSync();
   }
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
