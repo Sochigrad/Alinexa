@@ -404,12 +404,8 @@ signUpButton.addEventListener("pointerup", (event) => {
 });
 resetPasswordButton.addEventListener("click", sendPasswordResetEmail);
 signOutButton.addEventListener("click", signOut);
-signOutButton.addEventListener("pointerup", (event) => {
-  if (event.pointerType === "touch") {
-    event.preventDefault();
-    event.stopPropagation();
-    signOut(event);
-  }
+signOutButton.addEventListener("pointerdown", (event) => {
+  event.stopPropagation();
 });
 document.querySelectorAll("[data-preset]").forEach((button) => {
   button.addEventListener("click", () => previewTheme(themePresets[button.dataset.preset]));
@@ -1742,6 +1738,8 @@ async function initAuth() {
         openSheet(authSheet);
         setAuthStatus("Аккаунт подтвержден. Вы уже в своем кабинете.", "success");
         clearAuthUrl();
+      } else if (authMode === "sign-in" && authSheet.classList.contains("is-open")) {
+        closeSheets();
       }
     }
     if (!currentUser && event === "SIGNED_OUT") {
@@ -2397,16 +2395,30 @@ async function sendPasswordResetEmail() {
 
 async function signOut(event) {
   event?.preventDefault();
+  event?.stopPropagation?.();
   if (isSigningOut) {
-    return;
-  }
-  if (!ensureAuthReady()) {
     return;
   }
   isSigningOut = true;
   setAuthBusy(true);
+  currentUser = null;
+  currentSession = null;
+  clearPrivateWorkspaceFromThisDevice();
+  authPasswordInput.value = "";
+  authPasswordRepeatInput.value = "";
+  authForm.classList.remove("is-signed-in");
+  updateAuthUi(null);
+  setAuthMode("sign-in");
+  setAuthStatus("Вы вышли из аккаунта. Доска очищена на этом устройстве.", "success");
+  closeSheets();
+  setAuthBusy(false);
   try {
-    await supabaseClient.auth.signOut();
+    if (supabaseClient) {
+      await Promise.race([
+        supabaseClient.auth.signOut({ scope: "local" }),
+        new Promise((resolve) => setTimeout(resolve, 1200)),
+      ]);
+    }
   } finally {
     currentUser = null;
     currentSession = null;
