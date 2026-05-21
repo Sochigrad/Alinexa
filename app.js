@@ -7,6 +7,10 @@ const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
 const APP_URL = "https://alinexa.ru/";
+const SUPABASE_CDN_URLS = [
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
+  "https://unpkg.com/@supabase/supabase-js@2",
+];
 const PUSH_SUBSCRIPTIONS_TABLE = "alinexa_push_subscriptions";
 const VAPID_PUBLIC_KEY =
   "BBZsesectlp8qreP1O5lFR62o1LQRUAOd-T44sU3wpR3JhFKyv2hQyHK3XPG-7fOdaj-CO4Rze9TkEwWdkr_A5U";
@@ -176,6 +180,7 @@ let dragFrame = null;
 let columnDrag = null;
 let columnDragFrame = null;
 let supabaseClient = null;
+let supabaseLoadPromise = null;
 let currentUser = null;
 let currentSession = null;
 let remoteSaveTimer = null;
@@ -287,6 +292,30 @@ function bindActionButton(selector, handler) {
   });
 }
 
+function bindReliableTap(button, handler) {
+  if (!button) {
+    return;
+  }
+  let lastRunAt = 0;
+  const run = (event) => {
+    const now = Date.now();
+    if (now - lastRunAt < 350) {
+      return;
+    }
+    lastRunAt = now;
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    handler(event);
+  };
+  button.addEventListener("click", run);
+  button.addEventListener("touchend", run, { passive: false });
+  button.addEventListener("pointerup", (event) => {
+    if (event.pointerType === "touch") {
+      run(event);
+    }
+  });
+}
+
 bindActionButton("#menuButton", openSearchSheet);
 bindActionButton("#addCardButton", () => openCardSheet());
 bindActionButton("#addColumnButton", () => openColumnSheet());
@@ -305,8 +334,8 @@ document.querySelector("#closeVoiceButton").addEventListener("click", closeSheet
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
 document.querySelector("#closeAuthButton").addEventListener("click", closeSheets);
 accountButton.addEventListener("click", openAuthSheet);
-welcomeSignUpButton?.addEventListener("click", openRegistrationSheet);
-welcomeSignInButton?.addEventListener("click", openAuthSheet);
+bindReliableTap(welcomeSignUpButton, openRegistrationSheet);
+bindReliableTap(welcomeSignInButton, openAuthSheet);
 scrimEl.addEventListener("click", closeSheets);
 document.addEventListener("pointermove", moveTouchDrag, { passive: false });
 document.addEventListener("pointerup", finishTouchDrag, { passive: false });
@@ -1701,11 +1730,11 @@ function renderStats() {
 
 async function initAuth() {
   const arrivedFromSignupConfirmation = hasSignupConfirmationUrl();
-  supabaseClient = getSupabaseClient();
+  supabaseClient = await getSupabaseClient();
   if (!supabaseClient) {
     updateAuthUi(null);
     setAuthStatus(
-      "Подключение e-mail регистрации еще не настроено. Нужно вставить SUPABASE_URL и SUPABASE_ANON_KEY в app.js.",
+      "Не удалось загрузить подключение к Supabase. Обновите страницу и попробуйте еще раз.",
       "error",
     );
     return;
@@ -1771,8 +1800,12 @@ async function initAuth() {
   }
 }
 
-function getSupabaseClient() {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !window.supabase?.createClient) {
+async function getSupabaseClient() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return null;
+  }
+  const hasLibrary = await ensureSupabaseLibrary();
+  if (!hasLibrary || !window.supabase?.createClient) {
     return null;
   }
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -1781,6 +1814,61 @@ function getSupabaseClient() {
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
+  });
+}
+
+async function ensureSupabaseLibrary() {
+  if (window.supabase?.createClient) {
+    return true;
+  }
+  if (!supabaseLoadPromise) {
+    supabaseLoadPromise = (async () => {
+      await waitForSupabaseGlobal(1200);
+      if (window.supabase?.createClient) {
+        return true;
+      }
+      for (const src of SUPABASE_CDN_URLS) {
+        const loaded = await loadExternalScript(src);
+        if (loaded && window.supabase?.createClient) {
+          return true;
+        }
+      }
+      return false;
+    })();
+  }
+  return supabaseLoadPromise;
+}
+
+function waitForSupabaseGlobal(timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const tick = () => {
+      if (window.supabase?.createClient || Date.now() - startedAt >= timeoutMs) {
+        resolve(Boolean(window.supabase?.createClient));
+        return;
+      }
+      window.setTimeout(tick, 50);
+    };
+    tick();
+  });
+}
+
+function loadExternalScript(src) {
+  return new Promise((resolve) => {
+    const existing = [...document.scripts].find((script) => script.src === src);
+    if (existing && !existing.dataset.alinexaFailed) {
+      waitForSupabaseGlobal(1800).then(resolve);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve(Boolean(window.supabase?.createClient));
+    script.onerror = () => {
+      script.dataset.alinexaFailed = "true";
+      resolve(false);
+    };
+    document.head.append(script);
   });
 }
 
@@ -2105,7 +2193,7 @@ function setAuthMode(mode) {
 
 async function signInWithEmail(event) {
   event.preventDefault();
-  if (!ensureAuthReady()) {
+  if (!(await ensureAuthReady())) {
     return;
   }
 
@@ -2130,7 +2218,7 @@ async function signInWithEmail(event) {
 
 async function signUpWithEmail(event) {
   event?.preventDefault();
-  if (!ensureAuthReady()) {
+  if (!(await ensureAuthReady())) {
     return;
   }
 
@@ -2258,7 +2346,7 @@ function validateSignUpProfile(firstName, lastName) {
 
 async function saveNewPassword(event) {
   event.preventDefault();
-  if (!ensureAuthReady()) {
+  if (!(await ensureAuthReady())) {
     return;
   }
 
@@ -2369,7 +2457,7 @@ function clearPasswordRecoveryMarker() {
 }
 
 async function sendPasswordResetEmail() {
-  if (!ensureAuthReady()) {
+  if (!(await ensureAuthReady())) {
     return;
   }
 
@@ -2456,12 +2544,16 @@ function clearPrivateWorkspaceFromThisDevice() {
   render();
 }
 
-function ensureAuthReady() {
+async function ensureAuthReady() {
+  if (supabaseClient) {
+    return true;
+  }
+  supabaseClient = await getSupabaseClient();
   if (supabaseClient) {
     return true;
   }
   setAuthStatus(
-    "Нужно подключить Supabase: создать проект, включить Email Auth и вставить SUPABASE_URL / SUPABASE_ANON_KEY.",
+    "Не удалось загрузить подключение к Supabase. Обновите страницу и попробуйте еще раз.",
     "error",
   );
   return false;
