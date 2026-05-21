@@ -494,11 +494,11 @@ body:not(.is-authenticated) .topbar {
   border-radius: 8px;
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46);
-  animation: drop-marker-in 140ms ease-out;
+  animation: drop-marker-in 180ms ease-out;
   transition:
-    min-height 140ms ease,
-    background 140ms ease,
-    border-color 140ms ease;
+    min-height 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease;
 }
 
 @keyframes drop-marker-in {
@@ -534,10 +534,10 @@ body:not(.is-authenticated) .topbar {
   -ms-user-select: none;
   -webkit-touch-callout: none;
   transition:
-    transform 170ms cubic-bezier(0.2, 0.85, 0.2, 1),
-    box-shadow 170ms ease,
-    border-color 170ms ease,
-    background-color 170ms ease,
+    transform 210ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 190ms ease,
+    border-color 190ms ease,
+    background-color 190ms ease,
     opacity 130ms ease;
 }
 
@@ -576,7 +576,7 @@ body:not(.is-authenticated) .topbar {
   will-change: transform;
   transform: translate3d(0, 0, 0) rotate(1deg) scale(1.02);
   transition:
-    transform 56ms linear,
+    transform 82ms linear,
     box-shadow 140ms ease;
   box-shadow: 0 22px 52px rgba(15, 23, 42, 0.24);
 }
@@ -2154,12 +2154,20 @@ const welcomeSignInButton = document.querySelector("#welcomeSignInButton");
 let authMode = "sign-in";
 let ignoreNextAuthToggleClick = false;
 
-document.querySelector("#menuButton").addEventListener("click", openSearchSheet);
-document.querySelector("#addCardButton").addEventListener("click", () => openCardSheet());
-document.querySelector("#addColumnButton").addEventListener("click", () => openColumnSheet());
-document.querySelector("#searchButton").addEventListener("click", openSearchSheet);
-document.querySelector("#themeButton").addEventListener("click", openThemeSheet);
-document.querySelector("#voiceButton").addEventListener("click", openVoiceSheet);
+function bindActionButton(selector, handler) {
+  document.querySelector(selector).addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    handler(event);
+  });
+}
+
+bindActionButton("#menuButton", openSearchSheet);
+bindActionButton("#addCardButton", () => openCardSheet());
+bindActionButton("#addColumnButton", () => openColumnSheet());
+bindActionButton("#searchButton", openSearchSheet);
+bindActionButton("#themeButton", openThemeSheet);
+bindActionButton("#voiceButton", openVoiceSheet);
 document.querySelector("#closeSheetButton").addEventListener("click", closeSheets);
 document.querySelector("#closeColumnButton").addEventListener("click", closeSheets);
 document.querySelector("#closeSearchButton").addEventListener("click", closeSheets);
@@ -3248,26 +3256,28 @@ function animateDropShift(list, marker, previousRects) {
     element.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
     element.getBoundingClientRect();
     requestAnimationFrame(() => {
-      element.style.transition = "";
+      element.style.transition = "transform 210ms cubic-bezier(0.16, 1, 0.3, 1)";
       element.style.transform = "";
+      window.setTimeout(() => {
+        element.style.transition = "";
+      }, 220);
     });
   });
 }
 
 function autoScrollDuringDrag(clientX, clientY) {
   const boardRect = boardEl.getBoundingClientRect();
-  const edge = Math.min(120, Math.max(68, boardRect.width * 0.24));
+  const isCoarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches;
+  const edge = isCoarsePointer ? Math.min(110, Math.max(64, boardRect.width * 0.2)) : 72;
+  const maxHorizontalStep = isCoarsePointer ? 24 : 16;
+  const maxVerticalStep = isCoarsePointer ? 16 : 14;
   const leftDistance = Math.max(0, clientX - boardRect.left);
   const rightDistance = Math.max(0, boardRect.right - clientX);
   let horizontal = 0;
-  const dragDistance = clientX - (touchDrag?.startX ?? clientX);
-  if (Math.abs(dragDistance) > 34) {
-    horizontal = Math.sign(dragDistance) * Math.min(22, Math.max(10, Math.abs(dragDistance) / 7));
-  }
-  if (leftDistance < edge) {
-    horizontal = -Math.max(Math.abs(horizontal), Math.ceil(((edge - leftDistance) / edge) * 38));
-  } else if (rightDistance < edge) {
-    horizontal = Math.max(horizontal, Math.ceil(((edge - rightDistance) / edge) * 38));
+  if (leftDistance < edge && boardEl.scrollLeft > 0) {
+    horizontal = -Math.ceil(((edge - leftDistance) / edge) * maxHorizontalStep);
+  } else if (rightDistance < edge && boardEl.scrollLeft + boardEl.clientWidth < boardEl.scrollWidth - 1) {
+    horizontal = Math.ceil(((edge - rightDistance) / edge) * maxHorizontalStep);
   }
 
   const currentList = touchDrag?.overColumnId
@@ -3277,9 +3287,9 @@ function autoScrollDuringDrag(clientX, clientY) {
   if (currentList) {
     const listRect = currentList.getBoundingClientRect();
     if (clientY < listRect.top + edge) {
-      vertical = -18;
+      vertical = -maxVerticalStep;
     } else if (clientY > listRect.bottom - edge) {
-      vertical = 18;
+      vertical = maxVerticalStep;
     }
   }
 
@@ -4237,23 +4247,21 @@ function openCardSheet(cardId = null, columnId = quickColumnId) {
 function openColumnSheet(columnId = null) {
   activeColumnId = columnId;
   const column = state.columns.find((item) => item.id === columnId);
-  const hasCards = state.cards.some((card) => card.columnId === columnId);
-
   columnSheetTitle.textContent = column ? "Редактировать колонку" : "Новая колонка";
   columnTitleInput.value = column?.title || "";
   deleteColumnButton.hidden = !column;
-  deleteColumnButton.disabled = hasCards;
-  deleteColumnButton.textContent = hasCards ? "Есть карточки" : "Удалить";
+  deleteColumnButton.disabled = false;
+  deleteColumnButton.textContent = "Удалить";
   saveColumnButton.textContent = column ? "Сохранить" : "Добавить колонку";
   openSheet(columnSheet);
-  columnTitleInput.focus();
+  focusFieldAtSheetStart(columnSheet, columnTitleInput);
 }
 
 function openSearchSheet() {
   searchInput.value = "";
   renderSearch();
   openSheet(searchSheet);
-  searchInput.focus();
+  focusFieldAtSheetStart(searchSheet, searchInput);
 }
 
 function openThemeSheet() {
@@ -4416,21 +4424,31 @@ async function saveColumn(event) {
   await savePromise;
 }
 
-function deleteActiveColumn() {
+async function deleteActiveColumn() {
   if (!activeColumnId) {
     return;
   }
 
-  const hasCards = state.cards.some((card) => card.columnId === activeColumnId);
-  if (hasCards || state.columns.length <= 1) {
+  if (state.columns.length <= 1) {
     return;
+  }
+
+  const cardsInColumn = state.cards.filter((card) => card.columnId === activeColumnId);
+  if (cardsInColumn.length) {
+    const wantsDelete = confirm("Удалить колонку вместе с карточками?");
+    if (!wantsDelete) {
+      return;
+    }
+    cardsInColumn.forEach((card) => markCardDeleted(card.id));
+    state.cards = state.cards.filter((card) => card.columnId !== activeColumnId);
   }
 
   state.columns = state.columns.filter((column) => column.id !== activeColumnId);
   quickColumnId = state.columns[0]?.id || "";
-  persist();
+  const savePromise = persist({ immediate: true });
   render();
   closeSheets();
+  await savePromise;
 }
 
 async function deleteActiveCard(event) {
