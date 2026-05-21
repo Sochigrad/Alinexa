@@ -2,8 +2,9 @@ const STORAGE_KEY = "taskflow-board-v1";
 const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
+const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260521-auth-recovery-2";
+const APP_BUILD_ID = "20260521-auth-recovery-3";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -1844,7 +1845,8 @@ async function getSupabaseClient() {
   }
   const hasLibrary = await ensureSupabaseLibrary();
   if (!hasLibrary || !window.supabase?.createClient) {
-    return null;
+    supabaseClient = createSupabaseRestClient();
+    return supabaseClient;
   }
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
@@ -1909,6 +1911,231 @@ function loadExternalScript(src) {
     };
     document.head.append(script);
   });
+}
+
+function createSupabaseRestClient() {
+  const listeners = new Set();
+
+  const emitAuthEvent = (event, session) => {
+    listeners.forEach((listener) => {
+      try {
+        listener(event, session);
+      } catch {
+        // A listener should not break auth state updates.
+      }
+    });
+  };
+
+  const readStoredSession = () => {
+    try {
+      return JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || "null");
+    } catch {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      return null;
+    }
+  };
+
+  const storeSession = (session) => {
+    if (!session?.access_token) {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      return null;
+    }
+    const normalizedSession = {
+      ...session,
+      expires_at:
+        session.expires_at ||
+        Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600),
+    };
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(normalizedSession));
+    return normalizedSession;
+  };
+
+  const clearStoredSession = () => {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+  };
+
+  const request = async (path, { method = "GET", body, token = SUPABASE_ANON_KEY } = {}) => {
+    const headers = {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    };
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+    const response = await fetch(`${SUPABASE_URL}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message =
+        payload.msg ||
+        payload.message ||
+        payload.error_description ||
+        payload.error ||
+        `Supabase ${response.status}`;
+      return { data: null, error: new Error(message) };
+    }
+    return { data: payload, error: null };
+  };
+
+  const normalizeSessionPayload = (payload) => {
+    if (payload?.session?.access_token) {
+      return payload.session;
+    }
+    if (!payload?.access_token) {
+      return null;
+    }
+    return {
+      access_token: payload.access_token,
+      refresh_token: payload.refresh_token || "",
+      token_type: payload.token_type || "bearer",
+      expires_in: payload.expires_in || 3600,
+      expires_at: payload.expires_at,
+      user: payload.user || null,
+    };
+  };
+
+  const refreshStoredSession = async (session) => {
+    if (!session?.refresh_token) {
+      return session || null;
+    }
+    const expiresAt = Number(session.expires_at || 0);
+    if (expiresAt && expiresAt - 60 > Math.floor(Date.now() / 1000)) {
+      return session;
+    }
+    const { data, error } = await request("/auth/v1/token?grant_type=refresh_token", {
+      method: "POST",
+      body: { refresh_token: session.refresh_token },
+    });
+    if (error) {
+      clearStoredSession();
+      return null;
+    }
+    const refreshedSession = normalizeSessionPayload(data);
+    if (refreshedSession) {
+      return storeSession(refreshedSession);
+    }
+    return session;
+  };
+
+  const sessionFromUrl = async () => {
+    const params = getRecoveryUrlParams();
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    if (!accessToken || !refreshToken) {
+      return null;
+    }
+    const { data, error } = await request("/auth/v1/user", { token: accessToken });
+    if (error) {
+      return null;
+    }
+    return storeSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_type: "bearer",
+      expires_at: Number(params.get("expires_at")) || undefined,
+      user: data,
+    });
+  };
+
+  return {
+    auth: {
+      onAuthStateChange(callback) {
+        listeners.add(callback);
+        return {
+          data: {
+            subscription: {
+              unsubscribe() {
+                listeners.delete(callback);
+              },
+            },
+          },
+        };
+      },
+      async getSession() {
+        const urlSession = await sessionFromUrl();
+        const session = await refreshStoredSession(urlSession || readStoredSession());
+        return { data: { session }, error: null };
+      },
+      async signInWithPassword({ email, password }) {
+        const { data, error } = await request("/auth/v1/token?grant_type=password", {
+          method: "POST",
+          body: { email, password },
+        });
+        if (error) {
+          return { data: null, error };
+        }
+        const session = storeSession(normalizeSessionPayload(data));
+        emitAuthEvent("SIGNED_IN", session);
+        return { data: { session, user: session?.user || data?.user || null }, error: null };
+      },
+      async signUp({ email, password, options } = {}) {
+        const redirectTo = encodeURIComponent(options?.emailRedirectTo || APP_URL);
+        const { data, error } = await request(`/auth/v1/signup?redirect_to=${redirectTo}`, {
+          method: "POST",
+          body: { email, password, data: options?.data || {} },
+        });
+        if (error) {
+          return { data: null, error };
+        }
+        const session = storeSession(normalizeSessionPayload(data));
+        if (session) {
+          emitAuthEvent("SIGNED_IN", session);
+        }
+        return { data: { ...data, session }, error: null };
+      },
+      async resetPasswordForEmail(email, { redirectTo } = {}) {
+        const redirect = encodeURIComponent(redirectTo || `${APP_URL}?auth=recovery`);
+        const { error } = await request(`/auth/v1/recover?redirect_to=${redirect}`, {
+          method: "POST",
+          body: { email },
+        });
+        return { data: {}, error };
+      },
+      async setSession({ access_token: accessToken, refresh_token: refreshToken }) {
+        if (!accessToken || !refreshToken) {
+          return { data: null, error: new Error("Нет данных сессии.") };
+        }
+        const { data, error } = await request("/auth/v1/user", { token: accessToken });
+        if (error) {
+          return { data: null, error };
+        }
+        const session = storeSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          token_type: "bearer",
+          user: data,
+        });
+        emitAuthEvent("SIGNED_IN", session);
+        return { data: { session, user: data }, error: null };
+      },
+      async updateUser(attributes) {
+        const session = await refreshStoredSession(readStoredSession());
+        if (!session?.access_token) {
+          return { data: null, error: new Error("Нет активной сессии.") };
+        }
+        const { data, error } = await request("/auth/v1/user", {
+          method: "PUT",
+          token: session.access_token,
+          body: attributes,
+        });
+        if (error) {
+          return { data: null, error };
+        }
+        const nextSession = storeSession({ ...session, user: data });
+        emitAuthEvent("USER_UPDATED", nextSession);
+        return { data: { user: data }, error: null };
+      },
+      async signOut() {
+        clearStoredSession();
+        emitAuthEvent("SIGNED_OUT", null);
+        return { error: null };
+      },
+    },
+  };
 }
 
 function updateAuthUi(user) {
