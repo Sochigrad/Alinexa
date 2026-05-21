@@ -1550,6 +1550,20 @@ textarea {
     min-height: 46px;
     font-size: 16px;
   }
+
+  #voiceSheet {
+    top: max(4px, env(safe-area-inset-top, 0px));
+    height: calc(var(--visual-viewport-height, 100vh) - max(4px, env(safe-area-inset-top, 0px)));
+    max-height: calc(var(--visual-viewport-height, 100vh) - max(4px, env(safe-area-inset-top, 0px)));
+  }
+
+  #voiceSheet .voice-panel {
+    margin-top: 4px;
+  }
+
+  #voiceTextInput {
+    min-height: 118px;
+  }
 }
 
 </style>
@@ -2168,6 +2182,10 @@ bindActionButton("#addColumnButton", () => openColumnSheet());
 bindActionButton("#searchButton", openSearchSheet);
 bindActionButton("#themeButton", openThemeSheet);
 bindActionButton("#voiceButton", openVoiceSheet);
+document.querySelectorAll(".bottom-action").forEach((button) => {
+  button.addEventListener("pointerdown", (event) => event.stopPropagation());
+  button.addEventListener("touchstart", (event) => event.stopPropagation(), { passive: true });
+});
 document.querySelector("#closeSheetButton").addEventListener("click", closeSheets);
 document.querySelector("#closeColumnButton").addEventListener("click", closeSheets);
 document.querySelector("#closeSearchButton").addEventListener("click", closeSheets);
@@ -3147,6 +3165,7 @@ function finishTouchDrag(event) {
     quickColumnId = overColumnId;
     persist({ immediate: true });
     render();
+    followDroppedCard(overColumnId);
   }
 }
 
@@ -3167,6 +3186,7 @@ function finishTouchDragByTouch(event) {
     quickColumnId = overColumnId;
     persist({ immediate: true });
     render();
+    followDroppedCard(overColumnId);
   }
 }
 
@@ -3268,8 +3288,8 @@ function animateDropShift(list, marker, previousRects) {
 function autoScrollDuringDrag(clientX, clientY) {
   const boardRect = boardEl.getBoundingClientRect();
   const isCoarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches;
-  const edge = isCoarsePointer ? Math.min(110, Math.max(64, boardRect.width * 0.2)) : 72;
-  const maxHorizontalStep = isCoarsePointer ? 24 : 16;
+  const edge = isCoarsePointer ? Math.min(128, Math.max(74, boardRect.width * 0.22)) : 72;
+  const maxHorizontalStep = isCoarsePointer ? 18 : 16;
   const maxVerticalStep = isCoarsePointer ? 16 : 14;
   const leftDistance = Math.max(0, clientX - boardRect.left);
   const rightDistance = Math.max(0, boardRect.right - clientX);
@@ -3353,6 +3373,35 @@ function stopAutoScroll() {
     autoScrollFrame = null;
   }
   autoScrollState = { horizontal: 0, vertical: 0, list: null };
+}
+
+function shouldFollowDroppedCard() {
+  return window.matchMedia?.("(pointer: coarse)")?.matches || window.innerWidth < 860;
+}
+
+function followDroppedCard(columnId) {
+  if (!columnId || !shouldFollowDroppedCard()) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const column = boardEl.querySelector(`.column[data-column-id="${CSS.escape(columnId)}"]`);
+      if (!column) {
+        return;
+      }
+
+      const boardRect = boardEl.getBoundingClientRect();
+      const columnRect = column.getBoundingClientRect();
+      const centeredLeft =
+        boardEl.scrollLeft + columnRect.left - boardRect.left - Math.max(10, (boardRect.width - columnRect.width) / 2);
+      const maxLeft = Math.max(0, boardEl.scrollWidth - boardEl.clientWidth);
+      boardEl.scrollTo({
+        left: Math.max(0, Math.min(centeredLeft, maxLeft)),
+        behavior: "smooth",
+      });
+    });
+  });
 }
 
 function clearTextSelection() {
@@ -4286,7 +4335,9 @@ function openVoiceSheet() {
   voiceStatusInput.value = "today";
   setVoiceState("Готов к диктовке", "Нажмите кнопку и говорите. Текст попадет в карточку.");
   openSheet(voiceSheet);
-  voiceTextInput.focus();
+  if (!window.matchMedia?.("(pointer: coarse)")?.matches && window.innerWidth >= 860) {
+    focusFieldAtSheetStart(voiceSheet, voiceTextInput);
+  }
 }
 
 function openSheet(sheet) {
