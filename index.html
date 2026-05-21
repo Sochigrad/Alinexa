@@ -335,6 +335,7 @@ body:not(.is-authenticated) .topbar {
   scroll-padding-inline: 14px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
   user-select: none;
   -webkit-user-select: none;
   -ms-user-select: none;
@@ -462,7 +463,7 @@ body:not(.is-authenticated) .topbar {
   padding: 12px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
   user-select: none;
   -webkit-user-select: none;
   -ms-user-select: none;
@@ -494,7 +495,7 @@ body:not(.is-authenticated) .topbar {
   text-align: left;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
   cursor: grab;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
   user-select: none;
   -webkit-user-drag: none;
   -webkit-user-select: none;
@@ -1434,7 +1435,7 @@ textarea {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    touch-action: pan-y;
+    touch-action: pan-x pan-y;
     padding-bottom: 18px;
   }
 
@@ -1508,7 +1509,7 @@ textarea {
   }
 }
 
-</style>
+    </style>
   </head>
   <body>
     <div class="app-shell">
@@ -2130,6 +2131,9 @@ scrimEl.addEventListener("click", closeSheets);
 document.addEventListener("pointermove", moveTouchDrag, { passive: false });
 document.addEventListener("pointerup", finishTouchDrag, { passive: false });
 document.addEventListener("pointercancel", cancelTouchDrag);
+document.addEventListener("touchmove", moveTouchDragByTouch, { passive: false });
+document.addEventListener("touchend", finishTouchDragByTouch, { passive: false });
+document.addEventListener("touchcancel", cancelTouchDrag);
 
 cardForm.addEventListener("submit", saveCard);
 columnForm.addEventListener("submit", saveColumn);
@@ -2573,6 +2577,7 @@ function createCardElement(card) {
     }
     openCardSheet(card.id);
   });
+  button.addEventListener("touchstart", (event) => prepareTouchDragByTouch(event, button, card.id), { passive: true });
   button.addEventListener("pointerdown", (event) => prepareTouchDrag(event, button, card.id));
   button.addEventListener("dragstart", (event) => {
     clearTextSelection();
@@ -2845,6 +2850,10 @@ function updateCardReminderStatus() {
 }
 
 function prepareTouchDrag(event, cardEl, cardId) {
+  if (event.pointerType === "touch") {
+    return;
+  }
+
   if (event.pointerType === "mouse" && event.button !== 0) {
     return;
   }
@@ -2882,7 +2891,48 @@ function prepareTouchDrag(event, cardEl, cardId) {
   }
 }
 
+function getPrimaryTouch(event) {
+  return event.touches?.[0] || event.changedTouches?.[0] || null;
+}
+
+function prepareTouchDragByTouch(event, cardEl, cardId) {
+  if (event.touches?.length !== 1) {
+    return;
+  }
+
+  clearTimeout(longPressTimer);
+  const touch = getPrimaryTouch(event);
+  if (!touch) {
+    return;
+  }
+
+  const rect = cardEl.getBoundingClientRect();
+  pendingTouch = {
+    cardId,
+    cardEl,
+    pointerId: touch.identifier,
+    pointerType: "touch",
+    startX: touch.clientX,
+    startY: touch.clientY,
+    lastX: touch.clientX,
+    lastY: touch.clientY,
+    offsetX: touch.clientX - rect.left,
+    offsetY: touch.clientY - rect.top,
+    width: rect.width,
+  };
+
+  longPressTimer = setTimeout(() => {
+    if (pendingTouch?.pointerId === touch.identifier) {
+      startTouchDrag();
+    }
+  }, TOUCH_LONG_PRESS_MS);
+}
+
 function moveTouchDrag(event) {
+  if (event.pointerType === "touch") {
+    return;
+  }
+
   if (!touchDrag) {
     if (pendingTouch) {
       pendingTouch.lastX = event.clientX;
@@ -2912,6 +2962,40 @@ function moveTouchDrag(event) {
   event.preventDefault();
   touchDrag.clientX = event.clientX;
   touchDrag.clientY = event.clientY;
+
+  if (!dragFrame) {
+    dragFrame = requestAnimationFrame(updateTouchDrag);
+  }
+}
+
+function moveTouchDragByTouch(event) {
+  const touch = getPrimaryTouch(event);
+  if (!touch) {
+    return;
+  }
+
+  if (!touchDrag) {
+    if (pendingTouch?.pointerType === "touch") {
+      pendingTouch.lastX = touch.clientX;
+      pendingTouch.lastY = touch.clientY;
+      const deltaX = touch.clientX - pendingTouch.startX;
+      const deltaY = touch.clientY - pendingTouch.startY;
+      const distance = Math.hypot(deltaX, deltaY);
+      const isIntentionalScroll =
+        distance > TOUCH_SCROLL_CANCEL_PX &&
+        (Math.abs(deltaY) > Math.abs(deltaX) * 1.15 || Math.abs(deltaX) > Math.abs(deltaY) * 1.15);
+
+      if (isIntentionalScroll) {
+        clearTimeout(longPressTimer);
+        pendingTouch = null;
+      }
+    }
+    return;
+  }
+
+  event.preventDefault();
+  touchDrag.clientX = touch.clientX;
+  touchDrag.clientY = touch.clientY;
 
   if (!dragFrame) {
     dragFrame = requestAnimationFrame(updateTouchDrag);
@@ -2992,6 +3076,30 @@ function updateTouchDrag() {
 }
 
 function finishTouchDrag(event) {
+  if (event.pointerType === "touch") {
+    return;
+  }
+
+  clearTimeout(longPressTimer);
+  pendingTouch = null;
+  if (!touchDrag) {
+    return;
+  }
+
+  event.preventDefault();
+  suppressClickUntil = Date.now() + 450;
+  const { cardId, overColumnId, overIndex } = touchDrag;
+  cleanupTouchDrag();
+
+  if (overColumnId) {
+    moveCardToPosition(cardId, overColumnId, overIndex);
+    quickColumnId = overColumnId;
+    persist({ immediate: true });
+    render();
+  }
+}
+
+function finishTouchDragByTouch(event) {
   clearTimeout(longPressTimer);
   pendingTouch = null;
   if (!touchDrag) {
@@ -4892,6 +5000,6 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-</script>
+    </script>
   </body>
 </html>
