@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260522-auth-livefix-1";
+const APP_BUILD_ID = "20260522-auth-livefix-2";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -1009,7 +1009,7 @@ async function showCardReminder(cardId) {
 }
 
 function initServiceWorker() {
-  if (!("serviceWorker" in navigator) || location.protocol !== "https:") {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator) || location.protocol !== "https:") {
     return;
   }
 
@@ -1043,11 +1043,12 @@ async function flushOldAppCaches() {
 }
 
 function isIosStandaloneRequired() {
+  const nav = typeof navigator === "undefined" ? {} : navigator;
   const isIos =
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    /iPad|iPhone|iPod/.test(nav.userAgent || "") ||
+    (nav.platform === "MacIntel" && (nav.maxTouchPoints || 0) > 1);
   const isStandalone =
-    window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+    window.matchMedia?.("(display-mode: standalone)")?.matches || nav.standalone === true;
   return isIos && !isStandalone;
 }
 
@@ -1082,7 +1083,7 @@ async function ensurePushSubscription() {
     return "no-user";
   }
 
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
     return "unsupported";
   }
 
@@ -1121,7 +1122,7 @@ async function savePushSubscription(subscription) {
     user_id: currentUser.id,
     endpoint: subscription.endpoint,
     subscription: subscription.toJSON(),
-    user_agent: navigator.userAgent,
+    user_agent: typeof navigator === "undefined" ? "" : navigator.userAgent || "",
     updated_at: new Date().toISOString(),
   };
 
