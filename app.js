@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260521-auth-recovery-3";
+const APP_BUILD_ID = "20260522-auth-livefix-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -322,6 +322,47 @@ function bindReliableTap(button, handler) {
     }
   });
 }
+
+let lastCriticalActionAt = 0;
+let lastCriticalActionId = "";
+
+function runCriticalAction(event) {
+  const target = event.target?.closest?.(
+    "#welcomeSignUpButton,#welcomeSignInButton,#signInButton,#resetPasswordButton,#signOutButton,#closeAuthButton,#accountButton",
+  );
+  if (!target || target.disabled) {
+    return;
+  }
+
+  const now = Date.now();
+  if (target.id === lastCriticalActionId && now - lastCriticalActionAt < 450) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    return;
+  }
+  lastCriticalActionId = target.id;
+  lastCriticalActionAt = now;
+
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+
+  const actions = {
+    welcomeSignUpButton: openRegistrationSheet,
+    welcomeSignInButton: openAuthSheet,
+    accountButton: openAuthSheet,
+    signInButton: handleAuthSubmit,
+    resetPasswordButton: sendPasswordResetEmail,
+    signOutButton: signOut,
+    closeAuthButton: closeSheets,
+  };
+  actions[target.id]?.(event);
+}
+
+["click", "touchend", "pointerup"].forEach((eventName) => {
+  document.addEventListener(eventName, runCriticalAction, { capture: true, passive: false });
+});
 
 bindActionButton("#menuButton", openSearchSheet);
 bindActionButton("#addCardButton", () => openCardSheet());
