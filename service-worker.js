@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260522-auth-livefix-6";
+self.__ALINEXA_SW_VERSION__ = "20260525-auth-board-recover-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
@@ -40,7 +40,7 @@ self.addEventListener("push", (event) => {
 
   const title = payload.title || "Alinexa";
   const options = {
-    body: payload.body || "Напоминание по задаче",
+    body: payload.body || "Napominanie po zadache",
     tag: payload.tag || "alinexa-reminder",
     renotify: true,
     requireInteraction: true,
