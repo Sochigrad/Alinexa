@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260522-auth-livefix-6";
+const APP_BUILD_ID = "20260525-auth-board-recover-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -522,12 +522,20 @@ function loadBoard() {
 function persist({ immediate = false } = {}) {
   markLocalWorkspaceChanged();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  scheduleCardReminders();
+  safeScheduleCardReminders();
   hasUnsavedLocalChanges = true;
   if (immediate) {
     return saveRemoteWorkspace();
   }
   queueRemoteWorkspaceSave();
+}
+
+function safeScheduleCardReminders() {
+  try {
+    scheduleCardReminders();
+  } catch (error) {
+    console.warn("Alinexa reminders skipped to keep the board stable", error);
+  }
 }
 
 function markLocalWorkspaceChanged() {
@@ -788,6 +796,16 @@ function applyTheme(nextTheme) {
 }
 
 function render() {
+  try {
+    state = normalizeBoard(state);
+    renderBoardContent();
+  } catch (error) {
+    console.error("Alinexa board render failed", error);
+    renderBoardFallback();
+  }
+}
+
+function renderBoardContent() {
   renderStats();
   boardEl.innerHTML = "";
 
@@ -864,6 +882,69 @@ function render() {
   });
 
   // Deadline reminders are temporarily disabled to keep auth and board sync stable.
+}
+
+function renderBoardFallback() {
+  try {
+    renderStats();
+  } catch (error) {
+    console.warn("Alinexa stats fallback failed", error);
+  }
+
+  const columns = Array.isArray(state?.columns) && state.columns.length ? state.columns : defaultBoard.columns;
+  const cards = Array.isArray(state?.cards) ? state.cards : [];
+  boardEl.innerHTML = "";
+
+  columns.forEach((column, columnIndex) => {
+    const columnId = String(column?.id || `column-${columnIndex}`);
+    const title = String(column?.title || `Column ${columnIndex + 1}`);
+    const section = document.createElement("section");
+    section.className = "column";
+    section.dataset.columnId = columnId;
+    section.style.setProperty("--column-color", normalizeColumnColor(column?.color) || getDefaultColumnColor(column, columnIndex));
+
+    const header = document.createElement("div");
+    header.className = "column-header";
+    header.innerHTML = `
+      <div class="column-title">
+        <button class="column-color-handle" type="button" aria-label="${escapeHtml(title)}"></button>
+        <button class="column-name-button" type="button">${escapeHtml(title)}</button>
+      </div>
+      <div class="column-actions">
+        <button class="icon-btn column-add-btn" type="button">+</button>
+      </div>
+    `;
+    section.appendChild(header);
+
+    const list = document.createElement("div");
+    list.className = "card-list cards";
+    list.dataset.columnId = columnId;
+
+    cards
+      .filter((card) => String(card?.columnId || "") === columnId)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .forEach((card) => {
+        const button = document.createElement("button");
+        button.className = "task-card";
+        button.type = "button";
+        button.dataset.cardId = String(card?.id || "");
+        button.innerHTML = `<h3>${escapeHtml(String(card?.title || "Task"))}</h3>`;
+        button.addEventListener("click", () => openCardSheet(String(card?.id || ""), columnId));
+        list.appendChild(button);
+      });
+
+    if (!list.children.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-drop";
+      empty.textContent = "Перетащите карточку сюда";
+      list.appendChild(empty);
+    }
+
+    header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(columnId));
+    header.querySelector(".column-add-btn")?.addEventListener("click", () => openCardSheet(null, columnId));
+    section.appendChild(list);
+    boardEl.appendChild(section);
+  });
 }
 
 function getSafeStatusId(status, focus) {
@@ -2471,7 +2552,7 @@ async function saveRemoteWorkspace() {
 function openAuthSheet() {
   setAuthMode("sign-in");
   openSheet(authSheet);
-  if (!currentUser) {
+  if (!currentUser && shouldAutoFocusSheet()) {
     focusFieldAtSheetStart(authSheet, authEmailInput);
   }
 }
@@ -2479,7 +2560,9 @@ function openAuthSheet() {
 function openRegistrationSheet() {
   setAuthMode("sign-up");
   openSheet(authSheet);
-  focusFieldAtSheetStart(authSheet, authEmailInput);
+  if (shouldAutoFocusSheet()) {
+    focusFieldAtSheetStart(authSheet, authEmailInput);
+  }
 }
 
 function handleAuthSubmit(event) {
@@ -3070,16 +3153,34 @@ function openSheet(sheet) {
     item.classList.remove("is-open");
     item.setAttribute("aria-hidden", "true");
     item.hidden = item !== sheet;
+    if (item !== sheet) {
+      item.style.removeProperty("display");
+      item.style.removeProperty("visibility");
+      item.style.removeProperty("pointer-events");
+      item.style.removeProperty("opacity");
+    }
   });
   scrimEl.hidden = false;
+  document.documentElement.classList.add("sheet-open");
+  document.body.classList.add("sheet-open");
   sheet.hidden = false;
+  sheet.removeAttribute("hidden");
   sheet.scrollTop = 0;
   sheet.classList.add("is-open");
   sheet.setAttribute("aria-hidden", "false");
+  sheet.style.display = "block";
+  sheet.style.visibility = "visible";
+  sheet.style.pointerEvents = "auto";
+  sheet.style.opacity = "1";
   requestAnimationFrame(() => {
     sheet.hidden = false;
+    sheet.removeAttribute("hidden");
     sheet.classList.add("is-open");
     sheet.setAttribute("aria-hidden", "false");
+    sheet.style.display = "block";
+    sheet.style.visibility = "visible";
+    sheet.style.pointerEvents = "auto";
+    sheet.style.opacity = "1";
   });
 }
 
@@ -3098,6 +3199,10 @@ function focusFieldAtSheetStart(sheet, field) {
   });
 }
 
+function shouldAutoFocusSheet() {
+  return !window.matchMedia?.("(pointer: coarse)")?.matches && window.innerWidth >= 860;
+}
+
 function keepFieldVisibleInSheet(sheet, field) {
   const sheetRect = sheet.getBoundingClientRect();
   const fieldRect = field.getBoundingClientRect();
@@ -3112,8 +3217,14 @@ function closeSheets() {
     item.classList.remove("is-open");
     item.setAttribute("aria-hidden", "true");
     item.hidden = true;
+    item.style.removeProperty("display");
+    item.style.removeProperty("visibility");
+    item.style.removeProperty("pointer-events");
+    item.style.removeProperty("opacity");
   });
   scrimEl.hidden = true;
+  document.documentElement.classList.remove("sheet-open");
+  document.body.classList.remove("sheet-open");
   activeCardId = null;
   activeColumnId = null;
 }
