@@ -818,6 +818,10 @@ body.is-column-dragging * {
   transform: translateY(0);
 }
 
+.sheet[aria-hidden="false"] {
+  transform: translateY(0);
+}
+
 .sheet.compact {
   max-height: 62vh;
   max-height: 62svh;
@@ -1435,6 +1439,12 @@ textarea {
     pointer-events: auto;
     transform: translate(50%, -50%);
   }
+
+  .sheet[aria-hidden="false"] {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(50%, -50%);
+  }
 }
 
 @media (min-width: 1040px) {
@@ -1521,6 +1531,10 @@ textarea {
   }
 
   .sheet.is-open {
+    transform: translateY(0);
+  }
+
+  .sheet[aria-hidden="false"] {
     transform: translateY(0);
   }
 
