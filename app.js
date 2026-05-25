@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260522-auth-livefix-3";
+const APP_BUILD_ID = "20260522-auth-livefix-6";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -454,9 +454,6 @@ cardTimeInput.addEventListener("click", () => openNativePicker(cardTimeInput));
 cardDateInput.addEventListener("touchend", () => openNativePicker(cardDateInput), { passive: true });
 cardTimeInput.addEventListener("touchend", () => openNativePicker(cardTimeInput), { passive: true });
 cardReminderInput.addEventListener("change", () => {
-  if (cardReminderInput.checked) {
-    requestReminderPermission().catch(() => "failed");
-  }
   updateCardReminderStatus();
 });
 voiceFocusInput.addEventListener("change", () => {
@@ -794,15 +791,23 @@ function render() {
   renderStats();
   boardEl.innerHTML = "";
 
-  state.columns.forEach((column, columnIndex) => {
-    const cards = state.cards
-      .filter((card) => card.columnId === column.id)
+  const columns = Array.isArray(state?.columns) && state.columns.length ? state.columns : defaultBoard.columns;
+  const cardsSource = Array.isArray(state?.cards) ? state.cards : [];
+
+  columns.forEach((column, columnIndex) => {
+    const safeColumn = {
+      ...column,
+      id: String(column?.id || `column-${columnIndex}`),
+      title: String(column?.title || `Column ${columnIndex + 1}`),
+    };
+    const cards = cardsSource
+      .filter((card) => String(card?.columnId || "") === safeColumn.id)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const columnColor = normalizeColumnColor(column.color) || getDefaultColumnColor(column, columnIndex);
+    const columnColor = normalizeColumnColor(safeColumn.color) || getDefaultColumnColor(safeColumn, columnIndex);
 
     const section = document.createElement("section");
     section.className = "column";
-    section.dataset.columnId = column.id;
+    section.dataset.columnId = safeColumn.id;
     section.style.setProperty("--column-color", columnColor);
     section.addEventListener("dragover", handleDragOver);
     section.addEventListener("drop", handleDrop);
@@ -812,61 +817,92 @@ function render() {
     header.className = "column-header";
     header.innerHTML = `
       <div class="column-title">
-        <button class="column-color-handle" type="button" aria-label="Переместить колонку ${escapeHtml(column.title)}"></button>
-        <button class="column-name-button" type="button" aria-label="Переименовать ${escapeHtml(column.title)}">
-          ${escapeHtml(column.title)}
+        <button class="column-color-handle" type="button" aria-label="Переместить колонку ${escapeHtml(safeColumn.title)}"></button>
+        <button class="column-name-button" type="button" aria-label="Переименовать ${escapeHtml(safeColumn.title)}">
+          ${escapeHtml(safeColumn.title)}
         </button>
       </div>
       <div class="column-actions">
-        <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку ${escapeHtml(column.title)}">✎</button>
-        <button class="icon-btn column-add-btn" type="button" aria-label="Добавить карточку в ${escapeHtml(column.title)}">+</button>
+        <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку ${escapeHtml(safeColumn.title)}">✎</button>
+        <button class="icon-btn column-add-btn" type="button" aria-label="Добавить карточку в ${escapeHtml(safeColumn.title)}">+</button>
       </div>
     `;
     section.appendChild(header);
 
     const list = document.createElement("div");
-    list.className = "cards";
-    list.dataset.columnId = column.id;
+    list.className = "card-list cards";
+    list.dataset.columnId = safeColumn.id;
     list.addEventListener("dragover", handleListDragOver);
     list.addEventListener("drop", handleDrop);
-    if (!cards.length) {
+    const renderedCards = cards
+      .map((card) => {
+        try {
+          return createCardElement(card);
+        } catch (error) {
+          console.error("Alinexa card render failed", card, error);
+          return null;
+        }
+      })
+      .filter(Boolean);
+    if (!renderedCards.length) {
       const empty = document.createElement("div");
       empty.className = "empty-drop";
       empty.textContent = "Перетащите карточку сюда";
       list.appendChild(empty);
     } else {
-      cards.forEach((card) => list.appendChild(createCardElement(card)));
+      renderedCards.forEach((cardElement) => list.appendChild(cardElement));
     }
     section.appendChild(list);
 
     const colorHandle = header.querySelector(".column-color-handle");
-    colorHandle.addEventListener("pointerdown", (event) => startColumnDrag(event, column.id));
-    header.querySelector(".column-name-button").addEventListener("click", () => openColumnSheet(column.id));
-    header.querySelector(".column-edit-btn").addEventListener("click", () => openColumnSheet(column.id));
-    header.querySelector(".column-add-btn").addEventListener("click", () => openCardSheet(null, column.id));
+    colorHandle?.addEventListener("pointerdown", (event) => startColumnDrag(event, safeColumn.id));
+    header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
+    header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
+    header.querySelector(".column-add-btn")?.addEventListener("click", () => openCardSheet(null, safeColumn.id));
 
     boardEl.appendChild(section);
   });
 
-  scheduleReminderChecks();
+  // Deadline reminders are temporarily disabled to keep auth and board sync stable.
+}
+
+function getSafeStatusId(status, focus) {
+  const value = String(status || "").trim();
+  if (Object.prototype.hasOwnProperty.call(statusNames, value)) {
+    return value;
+  }
+  return focus ? "today" : "planned";
+}
+
+function getSafeLabelId(labelId) {
+  const value = String(labelId || "").trim();
+  if (getLabelById(value)) {
+    return value;
+  }
+  const safeLabels = Array.isArray(labels) ? labels : defaultLabels;
+  return safeLabels[0]?.id || defaultLabels[0]?.id || "product";
 }
 
 function createCardElement(card) {
+  const cardId = String(card?.id || "");
+  const title = String(card?.title || "").trim() || "Task";
+  const description = String(card?.description || "").trim();
+  const labelId = getSafeLabelId(card?.label);
   const button = document.createElement("button");
   button.className = "task-card";
   button.type = "button";
   button.draggable = false;
-  button.dataset.cardId = card.id;
-  const status = card.status || (card.focus ? "today" : "planned");
+  button.dataset.cardId = cardId;
+  const status = getSafeStatusId(card?.status, card?.focus);
   const scheduleText = formatCardSchedule(card);
   button.classList.add(`status-${status}`);
   button.innerHTML = `
-    <h3>${escapeHtml(card.title)}</h3>
-    ${card.description ? `<p>${escapeHtml(card.description)}</p>` : ""}
+    <h3>${escapeHtml(title)}</h3>
+    ${description ? `<p>${escapeHtml(description)}</p>` : ""}
     <div class="card-foot">
       <div class="card-badges">
-        <span class="label" style="--label-color: ${escapeHtml(getLabelColor(card.label))}">${getLabelName(card.label)}</span>
-        <span class="status-chip">${statusNames[status] || statusNames.planned}</span>
+        <span class="label" style="--label-color: ${escapeHtml(getLabelColor(labelId))}">${escapeHtml(getLabelName(labelId))}</span>
+        <span class="status-chip">${escapeHtml(statusNames[status] || statusNames.planned)}</span>
         ${scheduleText ? `<span class="schedule-chip">${escapeHtml(scheduleText)}</span>` : ""}
       </div>
       ${card.focus ? '<span class="focus-dot" aria-label="В фокусе"></span>' : ""}
@@ -877,13 +913,13 @@ function createCardElement(card) {
     if (Date.now() < suppressClickUntil) {
       return;
     }
-    openCardSheet(card.id);
+    openCardSheet(cardId);
   });
-  button.addEventListener("touchstart", (event) => prepareTouchDragByTouch(event, button, card.id), { passive: true });
-  button.addEventListener("pointerdown", (event) => prepareTouchDrag(event, button, card.id));
+  button.addEventListener("touchstart", (event) => prepareTouchDragByTouch(event, button, cardId), { passive: true });
+  button.addEventListener("pointerdown", (event) => prepareTouchDrag(event, button, cardId));
   button.addEventListener("dragstart", (event) => {
     clearTextSelection();
-    event.dataTransfer.setData("text/plain", card.id);
+    event.dataTransfer.setData("text/plain", cardId);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setDragImage(button, 16, 16);
     button.classList.add("is-dragging");
@@ -3025,14 +3061,26 @@ function openVoiceSheet() {
 }
 
 function openSheet(sheet) {
+  if (!sheet) {
+    console.warn("Alinexa sheet is missing");
+    scrimEl.hidden = true;
+    return;
+  }
   document.querySelectorAll(".sheet").forEach((item) => {
     item.classList.remove("is-open");
     item.setAttribute("aria-hidden", "true");
+    item.hidden = item !== sheet;
   });
   scrimEl.hidden = false;
+  sheet.hidden = false;
   sheet.scrollTop = 0;
   sheet.classList.add("is-open");
   sheet.setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => {
+    sheet.hidden = false;
+    sheet.classList.add("is-open");
+    sheet.setAttribute("aria-hidden", "false");
+  });
 }
 
 function updateVisualViewportHeight() {
@@ -3063,6 +3111,7 @@ function closeSheets() {
   document.querySelectorAll(".sheet").forEach((item) => {
     item.classList.remove("is-open");
     item.setAttribute("aria-hidden", "true");
+    item.hidden = true;
   });
   scrimEl.hidden = true;
   activeCardId = null;
@@ -3071,7 +3120,7 @@ function closeSheets() {
 
 async function saveCard(event) {
   event.preventDefault();
-  const reminderEnabled = cardReminderInput.checked;
+  const reminderEnabled = false;
   const changedAt = Date.now();
   const payload = {
     title: cardTitleInput.value.trim(),
@@ -3088,16 +3137,6 @@ async function saveCard(event) {
 
   if (!payload.title) {
     return;
-  }
-
-  if (reminderEnabled && (!payload.plannedDate || !payload.plannedTime)) {
-    cardReminderStatus.textContent = "Выберите дату и время, чтобы включить e-mail напоминание.";
-    cardReminderStatus.classList.add("is-error");
-    return;
-  }
-
-  if (reminderEnabled) {
-    requestReminderPermission().catch(() => "failed");
   }
 
   if (activeCardId) {
@@ -3472,15 +3511,17 @@ function addLabelDraft() {
 }
 
 function getLabelName(label) {
-  return getLabelById(label)?.name || label;
+  return getLabelById(label)?.name || defaultLabels[0]?.name || "Label";
 }
 
 function getLabelColor(label) {
-  return getLabelById(label)?.color || "#e2e8f0";
+  return getLabelById(label)?.color || defaultLabels[0]?.color || "#e2e8f0";
 }
 
 function getLabelById(labelId) {
-  return labels.find((label) => label.id === labelId);
+  const value = String(labelId || "").trim();
+  const safeLabels = Array.isArray(labels) ? labels : defaultLabels;
+  return safeLabels.find((label) => String(label.id) === value);
 }
 
 function toggleVoiceRecognition(target) {
