@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260525-auth-board-recover-1";
+self.__ALINEXA_SW_VERSION__ = "20260526-drag-restore-2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
