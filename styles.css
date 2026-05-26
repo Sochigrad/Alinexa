@@ -107,7 +107,7 @@ body:not(.is-authenticated) .topbar {
 
 .topbar {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   padding: 14px 14px 8px;
@@ -586,7 +586,7 @@ body.is-column-dragging * {
 }
 
 .task-card.is-dragging {
-  opacity: 0.48;
+  opacity: 1;
 }
 
 .task-card.is-lifted {
@@ -595,11 +595,11 @@ body.is-column-dragging * {
   pointer-events: none;
   touch-action: none;
   will-change: transform;
-  transform: translate3d(0, 0, 0) rotate(1deg) scale(1.02);
+  transform: translate3d(0, 0, 0);
   transition:
     transform 82ms linear,
     box-shadow 140ms ease;
-  box-shadow: 0 22px 52px rgba(15, 23, 42, 0.24);
+  opacity: 1;
 }
 
 .task-card h3,
@@ -1336,7 +1336,7 @@ textarea {
   }
 
   .topbar {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding-top: 24px;
   }
 
