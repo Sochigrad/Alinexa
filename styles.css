@@ -260,6 +260,13 @@ body:not(.is-authenticated) .topbar {
   width: min(100%, 380px);
 }
 
+#welcomeSignUpButton,
+#welcomeSignInButton {
+  position: relative;
+  z-index: 2;
+  touch-action: manipulation;
+}
+
 .primary-button,
 .secondary-button {
   min-height: 52px;
@@ -830,6 +837,15 @@ body.is-column-dragging * {
 #authSheet.compact {
   height: min(92svh, calc(var(--visual-viewport-height, 100vh) - 12px));
   max-height: min(92svh, calc(var(--visual-viewport-height, 100vh) - 12px));
+}
+
+#authSheet.is-open,
+#authSheet[aria-hidden="false"] {
+  z-index: 70;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .sheet-handle {
