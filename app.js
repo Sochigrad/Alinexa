@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260526-drag-restore-2";
+const APP_BUILD_ID = "20260526-drag-restore-3";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -172,6 +172,7 @@ let quickColumnId = state.columns[0]?.id || "";
 let longPressTimer = null;
 let pendingTouch = null;
 let touchDrag = null;
+let nativeDrag = null;
 const TOUCH_LONG_PRESS_MS = 340;
 const TOUCH_SCROLL_CANCEL_PX = 18;
 const TOUCH_MOUSE_DRAG_PX = 4;
@@ -1003,10 +1004,15 @@ function createCardElement(card) {
     event.dataTransfer.setDragImage(button, 16, 16);
     button.classList.add("is-dragging");
     document.body.classList.add("is-card-dragging");
+    nativeDrag = {
+      cardId,
+      cardEl: button,
+      marker: createDropMarker(button),
+      currentList: null,
+    };
   });
   button.addEventListener("dragend", () => {
-    button.classList.remove("is-dragging");
-    document.body.classList.remove("is-card-dragging");
+    cleanupNativeDrag();
     clearTextSelection();
   });
   return button;
@@ -1585,6 +1591,20 @@ function cleanupTouchDrag() {
   document.body.classList.remove("is-card-dragging");
   clearTextSelection();
   touchDrag = null;
+}
+
+function cleanupNativeDrag() {
+  if (!nativeDrag) {
+    document.body.classList.remove("is-card-dragging");
+    return;
+  }
+
+  nativeDrag.currentList?.classList.remove("is-over");
+  nativeDrag.currentList?.closest(".column")?.classList.remove("is-drop-target");
+  nativeDrag.marker?.remove();
+  nativeDrag.cardEl?.classList.remove("is-dragging");
+  document.body.classList.remove("is-card-dragging");
+  nativeDrag = null;
 }
 
 function createDropMarker(cardEl) {
@@ -3829,24 +3849,59 @@ function renderSearch() {
 
 function onDragOver(event) {
   event.preventDefault();
-  event.currentTarget.classList.add("is-over");
+  const list = getDropListFromTarget(event.currentTarget);
+  if (!list) {
+    return;
+  }
+
+  list.classList.add("is-over");
+  list.closest(".column")?.classList.add("is-drop-target");
+
+  if (nativeDrag?.cardId && nativeDrag.marker) {
+    if (nativeDrag.currentList && nativeDrag.currentList !== list) {
+      nativeDrag.currentList.classList.remove("is-over");
+      nativeDrag.currentList.closest(".column")?.classList.remove("is-drop-target");
+    }
+    nativeDrag.currentList = list;
+    const dropIndex = getDropIndex(list, event.clientY, nativeDrag.cardId);
+    placeDropMarker(list, dropIndex, nativeDrag.cardId, nativeDrag.marker);
+  }
 }
 
 function onDragLeave(event) {
-  event.currentTarget.classList.remove("is-over");
+  const list = getDropListFromTarget(event.currentTarget);
+  if (!list || nativeDrag?.currentList === list) {
+    return;
+  }
+  list.classList.remove("is-over");
+  list.closest(".column")?.classList.remove("is-drop-target");
 }
 
 function onDrop(event) {
   event.preventDefault();
-  const cardId = event.dataTransfer.getData("text/plain");
-  const columnId = event.currentTarget.dataset.columnId;
-  const dropIndex = getDropIndex(event.currentTarget, event.clientY, cardId);
-  event.currentTarget.classList.remove("is-over");
+  event.stopPropagation();
+  const list = getDropListFromTarget(event.currentTarget);
+  const cardId = event.dataTransfer.getData("text/plain") || nativeDrag?.cardId;
+  const columnId = list?.dataset.columnId || event.currentTarget.dataset.columnId;
+  const dropIndex = list ? getDropIndex(list, event.clientY, cardId) : 0;
+  cleanupNativeDrag();
+
+  if (!cardId || !columnId) {
+    return;
+  }
 
   moveCardToPosition(cardId, columnId, dropIndex);
   quickColumnId = columnId;
   persist({ immediate: true });
   render();
+  followDroppedCard(columnId);
+}
+
+function getDropListFromTarget(target) {
+  if (target?.classList?.contains("card-list")) {
+    return target;
+  }
+  return target?.querySelector?.(".card-list") || null;
 }
 
 function moveCardToPosition(cardId, columnId, dropIndex) {
