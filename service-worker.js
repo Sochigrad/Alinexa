@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260526-card-ui-cleanup-1";
+self.__ALINEXA_SW_VERSION__ = "20260526-drag-solid-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
