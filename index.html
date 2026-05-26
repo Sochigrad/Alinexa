@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=20260526-card-ui-cleanup-1" />
+    <link rel="stylesheet" href="styles.css?v=20260526-drag-solid-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -145,11 +145,6 @@
               <input id="cardTimeInput" name="plannedTime" type="time" />
             </label>
           </div>
-          <label class="checkbox-row reminder-row">
-            <input id="cardReminderInput" name="reminder" type="checkbox" />
-            <span>Напомнить по почте</span>
-          </label>
-          <p class="reminder-status" id="cardReminderStatus"></p>
         </div>
         <div class="sheet-actions">
           <button class="danger-button" id="deleteCardButton" type="button">Удалить</button>
@@ -348,7 +343,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260526-card-ui-cleanup-1";
+      window.ALINEXA_BUILD_ID = "20260526-drag-solid-1";
       window.addEventListener("load", () => {
         if ("caches" in window) {
           caches
@@ -366,6 +361,6 @@
         }
       });
     </script>
-    <script src="app.js?v=20260526-card-ui-cleanup-1" defer></script>
+    <script src="app.js?v=20260526-drag-solid-1" defer></script>
   </body>
 </html>
