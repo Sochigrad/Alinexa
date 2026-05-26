@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260526-card-ui-cleanup-1";
+const APP_BUILD_ID = "20260526-drag-solid-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -453,7 +453,7 @@ cardDateInput.addEventListener("click", () => openNativePicker(cardDateInput));
 cardTimeInput.addEventListener("click", () => openNativePicker(cardTimeInput));
 cardDateInput.addEventListener("touchend", () => openNativePicker(cardDateInput), { passive: true });
 cardTimeInput.addEventListener("touchend", () => openNativePicker(cardTimeInput), { passive: true });
-cardReminderInput.addEventListener("change", () => {
+cardReminderInput?.addEventListener("change", () => {
   updateCardReminderStatus();
 });
 voiceFocusInput.addEventListener("change", () => {
@@ -1264,27 +1264,15 @@ async function savePushSubscription(subscription) {
 function updateCardReminderStatus() {
   if (!cardReminderStatus) return;
   const draftCard = { plannedDate: cardDateInput.value, plannedTime: cardTimeInput.value };
-  const hasSchedule = Boolean(draftCard.plannedDate && draftCard.plannedTime);
   const scheduleText = formatCardSchedule(draftCard);
-  const isReminderOn = cardReminderInput.checked;
   cardReminderStatus.classList.remove("is-error", "is-success");
 
-  if (isReminderOn && !hasSchedule) {
-    cardReminderStatus.textContent = "Выберите дату и время, чтобы письмо-напоминание пришло вовремя.";
-    cardReminderStatus.classList.add("is-error");
-    return;
-  }
-  if (scheduleText && isReminderOn) {
-    cardReminderStatus.textContent = `Письмо-напоминание придет на e-mail аккаунта: ${scheduleText}. Если страница открыта, сработает и браузерное уведомление со звуком.`;
-    cardReminderStatus.classList.add("is-success");
-    return;
-  }
   if (scheduleText) {
     cardReminderStatus.textContent = `Запланировано: ${scheduleText}.`;
     cardReminderStatus.classList.add("is-success");
     return;
   }
-  cardReminderStatus.textContent = "Можно указать дату, время и включить e-mail напоминание.";
+  cardReminderStatus.textContent = "";
 }
 
 function prepareTouchDrag(event, cardEl, cardId) {
@@ -1461,6 +1449,8 @@ function startTouchDrag(event = null) {
     clientY,
     currentList: null,
     marker: createDropMarker(cardEl),
+    originalParent: cardEl.parentElement,
+    originalNextSibling: cardEl.nextElementSibling,
     offsetX,
     offsetY,
     overColumnId: cardEl.closest(".column")?.dataset.columnId || null,
@@ -1481,7 +1471,8 @@ function startTouchDrag(event = null) {
   cardEl.style.width = `${width}px`;
   cardEl.style.left = `${clientX - offsetX}px`;
   cardEl.style.top = `${clientY - offsetY}px`;
-  cardEl.style.transform = "translate3d(0, 0, 0) rotate(1deg) scale(1.02)";
+  document.body.appendChild(cardEl);
+  cardEl.style.transform = "translate3d(0, 0, 0)";
   suppressClickUntil = Date.now() + 650;
 }
 
@@ -1493,7 +1484,7 @@ function updateTouchDrag() {
 
   const deltaX = touchDrag.clientX - touchDrag.offsetX - touchDrag.originLeft;
   const deltaY = touchDrag.clientY - touchDrag.offsetY - touchDrag.originTop;
-  touchDrag.cardEl.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) rotate(1deg) scale(1.02)`;
+  touchDrag.cardEl.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
 
   autoScrollDuringDrag(touchDrag.clientX, touchDrag.clientY);
   const target = document.elementFromPoint(touchDrag.clientX, touchDrag.clientY);
@@ -1579,6 +1570,9 @@ function cleanupTouchDrag() {
   touchDrag.currentList?.classList.remove("is-over");
   touchDrag.currentList?.closest(".column")?.classList.remove("is-drop-target");
   touchDrag.marker?.remove();
+  if (touchDrag.originalParent && touchDrag.cardEl.parentElement === document.body) {
+    touchDrag.originalParent.insertBefore(touchDrag.cardEl, touchDrag.originalNextSibling || null);
+  }
   touchDrag.cardEl.classList.remove("is-lifted");
   touchDrag.cardEl.style.width = "";
   touchDrag.cardEl.style.left = "";
@@ -3104,7 +3098,9 @@ function openCardSheet(cardId = null, columnId = quickColumnId) {
   cardStatusInput.value = card?.status || (card?.focus ? "today" : "planned");
   cardDateInput.value = card?.plannedDate || "";
   cardTimeInput.value = card?.plannedTime || "";
-  cardReminderInput.checked = Boolean(card?.reminderEnabled);
+  if (cardReminderInput) {
+    cardReminderInput.checked = false;
+  }
   updateCardReminderStatus();
   deleteCardButton.hidden = !card;
   openSheet(cardSheet);
