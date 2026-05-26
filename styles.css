@@ -591,7 +591,7 @@ body.is-column-dragging * {
 
 .task-card.is-lifted {
   position: fixed;
-  z-index: 40;
+  z-index: 2147483000;
   pointer-events: none;
   touch-action: none;
   will-change: transform;
@@ -599,7 +599,12 @@ body.is-column-dragging * {
   transition:
     transform 82ms linear,
     box-shadow 140ms ease;
-  opacity: 1;
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.98);
+  filter: none;
+  mix-blend-mode: normal;
+  isolation: isolate;
+  box-shadow: 0 26px 56px rgba(15, 23, 42, 0.3);
 }
 
 .task-card h3,
