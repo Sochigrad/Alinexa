@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260526-drag-restore-3";
+const APP_BUILD_ID = "20260526-card-ui-cleanup-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -361,7 +361,6 @@ function runCriticalAction(event) {
   actions[target.id]?.(event);
 }
 
-bindActionButton("#menuButton", openSearchSheet);
 bindActionButton("#addCardButton", () => openCardSheet());
 bindActionButton("#addColumnButton", () => openColumnSheet());
 bindActionButton("#searchButton", openSearchSheet);
@@ -843,7 +842,6 @@ function renderBoardContent() {
       </div>
       <div class="column-actions">
         <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку ${escapeHtml(safeColumn.title)}">✎</button>
-        <button class="icon-btn column-add-btn" type="button" aria-label="Добавить карточку в ${escapeHtml(safeColumn.title)}">+</button>
       </div>
     `;
     section.appendChild(header);
@@ -877,7 +875,6 @@ function renderBoardContent() {
     colorHandle?.addEventListener("pointerdown", (event) => startColumnDrag(event, safeColumn.id));
     header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
     header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
-    header.querySelector(".column-add-btn")?.addEventListener("click", () => openCardSheet(null, safeColumn.id));
 
     boardEl.appendChild(section);
   });
@@ -914,7 +911,7 @@ function renderBoardFallback() {
         <button class="column-name-button" type="button">${escapeHtml(title)}</button>
       </div>
       <div class="column-actions">
-        <button class="icon-btn column-add-btn" type="button">+</button>
+        <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку">✎</button>
       </div>
     `;
     section.appendChild(header);
@@ -940,7 +937,7 @@ function renderBoardFallback() {
     }
 
     header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(columnId));
-    header.querySelector(".column-add-btn")?.addEventListener("click", () => openCardSheet(null, columnId));
+    header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(columnId));
     section.appendChild(list);
     boardEl.appendChild(section);
   });
