@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260525-auth-board-recover-1";
+const APP_BUILD_ID = "20260526-drag-restore-2";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -328,7 +328,7 @@ let lastCriticalActionId = "";
 
 function runCriticalAction(event) {
   const target = event.target?.closest?.(
-    "#welcomeSignUpButton,#welcomeSignInButton,#signInButton,#resetPasswordButton,#signOutButton,#closeAuthButton,#accountButton",
+    "#signInButton,#resetPasswordButton,#signOutButton,#closeAuthButton",
   );
   if (!target || target.disabled) {
     return;
@@ -360,10 +360,6 @@ function runCriticalAction(event) {
   actions[target.id]?.(event);
 }
 
-["click", "touchend", "pointerup"].forEach((eventName) => {
-  document.addEventListener(eventName, runCriticalAction, { capture: true, passive: false });
-});
-
 bindActionButton("#menuButton", openSearchSheet);
 bindActionButton("#addCardButton", () => openCardSheet());
 bindActionButton("#addColumnButton", () => openColumnSheet());
@@ -381,9 +377,13 @@ document.querySelector("#closeThemeButton").addEventListener("click", closeSheet
 document.querySelector("#closeVoiceButton").addEventListener("click", closeSheets);
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
 document.querySelector("#closeAuthButton").addEventListener("click", closeSheets);
-accountButton.addEventListener("click", openAuthSheet);
+bindReliableTap(accountButton, openAuthSheet);
 bindReliableTap(welcomeSignUpButton, openRegistrationSheet);
 bindReliableTap(welcomeSignInButton, openAuthSheet);
+bindReliableTap(document.querySelector("#signInButton"), handleAuthSubmit);
+bindReliableTap(document.querySelector("#resetPasswordButton"), sendPasswordResetEmail);
+bindReliableTap(document.querySelector("#signOutButton"), signOut);
+bindReliableTap(document.querySelector("#closeAuthButton"), closeSheets);
 scrimEl.addEventListener("click", closeSheets);
 document.addEventListener("pointermove", moveTouchDrag, { passive: false });
 document.addEventListener("pointerup", finishTouchDrag, { passive: false });
@@ -827,8 +827,8 @@ function renderBoardContent() {
     section.className = "column";
     section.dataset.columnId = safeColumn.id;
     section.style.setProperty("--column-color", columnColor);
-    section.addEventListener("dragover", handleDragOver);
-    section.addEventListener("drop", handleDrop);
+    section.addEventListener("dragover", onDragOver);
+    section.addEventListener("drop", onDrop);
     section.addEventListener("dragleave", handleDragLeave);
 
     const header = document.createElement("div");
@@ -850,8 +850,8 @@ function renderBoardContent() {
     const list = document.createElement("div");
     list.className = "card-list cards";
     list.dataset.columnId = safeColumn.id;
-    list.addEventListener("dragover", handleListDragOver);
-    list.addEventListener("drop", handleDrop);
+    list.addEventListener("dragover", onDragOver);
+    list.addEventListener("drop", onDrop);
     const renderedCards = cards
       .map((card) => {
         try {
@@ -902,6 +902,8 @@ function renderBoardFallback() {
     section.className = "column";
     section.dataset.columnId = columnId;
     section.style.setProperty("--column-color", normalizeColumnColor(column?.color) || getDefaultColumnColor(column, columnIndex));
+    section.addEventListener("dragover", onDragOver);
+    section.addEventListener("drop", onDrop);
 
     const header = document.createElement("div");
     header.className = "column-header";
@@ -919,18 +921,14 @@ function renderBoardFallback() {
     const list = document.createElement("div");
     list.className = "card-list cards";
     list.dataset.columnId = columnId;
+    list.addEventListener("dragover", onDragOver);
+    list.addEventListener("drop", onDrop);
 
     cards
       .filter((card) => String(card?.columnId || "") === columnId)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       .forEach((card) => {
-        const button = document.createElement("button");
-        button.className = "task-card";
-        button.type = "button";
-        button.dataset.cardId = String(card?.id || "");
-        button.innerHTML = `<h3>${escapeHtml(String(card?.title || "Task"))}</h3>`;
-        button.addEventListener("click", () => openCardSheet(String(card?.id || ""), columnId));
-        list.appendChild(button);
+        list.appendChild(createCardElement({ ...card, columnId }));
       });
 
     if (!list.children.length) {
@@ -972,7 +970,7 @@ function createCardElement(card) {
   const button = document.createElement("button");
   button.className = "task-card";
   button.type = "button";
-  button.draggable = false;
+  button.draggable = !window.matchMedia?.("(pointer: coarse)")?.matches;
   button.dataset.cardId = cardId;
   const status = getSafeStatusId(card?.status, card?.focus);
   const scheduleText = formatCardSchedule(card);
@@ -1421,7 +1419,7 @@ function moveTouchDragByTouch(event) {
       const distance = Math.hypot(deltaX, deltaY);
       const isIntentionalScroll =
         distance > TOUCH_SCROLL_CANCEL_PX &&
-        (Math.abs(deltaY) > Math.abs(deltaX) * 1.15 || Math.abs(deltaX) > Math.abs(deltaY) * 1.15);
+        Math.abs(deltaY) > Math.abs(deltaX) * 1.15;
 
       if (isIntentionalScroll) {
         clearTimeout(longPressTimer);
