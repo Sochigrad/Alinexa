@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260605-column-picker-mobile-fix-1";
+const APP_BUILD_ID = "20260608-trello-flow-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -153,6 +153,7 @@ const defaultBoard = {
     },
   ],
   deletedCards: {},
+  archivedCards: [],
 };
 
 function createPrivateEmptyBoard() {
@@ -160,6 +161,7 @@ function createPrivateEmptyBoard() {
     columns: structuredClone(defaultBoard.columns),
     cards: [],
     deletedCards: {},
+    archivedCards: [],
   });
 }
 
@@ -236,6 +238,10 @@ const saveColumnButton = document.querySelector("#saveColumnButton");
 const searchSheet = document.querySelector("#searchSheet");
 const searchInput = document.querySelector("#searchInput");
 const searchResults = document.querySelector("#searchResults");
+
+const archiveSheet = document.querySelector("#archiveSheet");
+const archiveList = document.querySelector("#archiveList");
+const archiveButton = document.querySelector("#archiveButton");
 
 const themeSheet = document.querySelector("#themeSheet");
 const themeForm = document.querySelector("#themeForm");
@@ -366,6 +372,7 @@ bindActionButton("#addColumnButton", () => openColumnSheet());
 bindActionButton("#searchButton", openSearchSheet);
 bindActionButton("#themeButton", openThemeSheet);
 bindActionButton("#voiceButton", openVoiceSheet);
+archiveButton?.addEventListener("click", openArchiveSheet);
 document.querySelectorAll(".bottom-action").forEach((button) => {
   button.addEventListener("pointerdown", (event) => event.stopPropagation());
   button.addEventListener("touchstart", (event) => event.stopPropagation(), { passive: true });
@@ -373,6 +380,7 @@ document.querySelectorAll(".bottom-action").forEach((button) => {
 document.querySelector("#closeSheetButton").addEventListener("click", closeSheets);
 document.querySelector("#closeColumnButton").addEventListener("click", closeSheets);
 document.querySelector("#closeSearchButton").addEventListener("click", closeSheets);
+document.querySelector("#closeArchiveButton")?.addEventListener("click", closeSheets);
 document.querySelector("#closeThemeButton").addEventListener("click", closeSheets);
 document.querySelector("#closeVoiceButton").addEventListener("click", closeSheets);
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
@@ -571,6 +579,17 @@ function mergeBoards(localBoard, remoteBoard) {
     ...normalizedRemote.deletedCards,
     ...normalizedLocal.deletedCards,
   };
+  const archiveMap = new Map();
+  [...(normalizedRemote.archivedCards || []), ...(normalizedLocal.archivedCards || [])].forEach((card) => {
+    if (!card?.id) {
+      return;
+    }
+    const previousCard = archiveMap.get(card.id);
+    if (!previousCard || getCardVersion(card) >= getCardVersion(previousCard)) {
+      archiveMap.set(card.id, { ...card });
+    }
+  });
+  const archivedIds = new Set(archiveMap.keys());
   const deletedIds = new Set(Object.keys(deletedCards));
   const columnMap = new Map();
   [...normalizedRemote.columns, ...normalizedLocal.columns].forEach((column) => {
@@ -582,7 +601,7 @@ function mergeBoards(localBoard, remoteBoard) {
 
   const cardMap = new Map();
   [...normalizedRemote.cards, ...normalizedLocal.cards].forEach((card) => {
-    if (!card?.id || deletedIds.has(card.id)) {
+    if (!card?.id || deletedIds.has(card.id) || archivedIds.has(card.id)) {
       return;
     }
     const previousCard = cardMap.get(card.id);
@@ -601,6 +620,7 @@ function mergeBoards(localBoard, remoteBoard) {
     columns: [...columnMap.values()],
     cards,
     deletedCards,
+    archivedCards: [...archiveMap.values()],
   });
 }
 
@@ -627,6 +647,29 @@ function normalizeDeletedCards(value) {
     );
   }
   return {};
+}
+
+function normalizeArchivedCards(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seen = new Set();
+  return value
+    .filter((card) => card?.id && !seen.has(String(card.id)) && seen.add(String(card.id)))
+    .map((card, index) => ({
+      ...card,
+      id: String(card.id),
+      title: String(card.title || "").trim() || "Task",
+      description: String(card.description || ""),
+      label: String(card.label || "product"),
+      status: getSafeStatusId(card.status, card.focus),
+      columnId: String(card.columnId || ""),
+      order: Number.isFinite(card.order) ? card.order : index,
+      createdAt: Number(card.createdAt) || Date.now(),
+      updatedAt: Number(card.updatedAt) || Number(card.createdAt) || Date.now(),
+      archivedAt: Number(card.archivedAt) || Number(card.updatedAt) || Date.now(),
+      archivedFromColumnId: String(card.archivedFromColumnId || card.columnId || ""),
+    }));
 }
 
 function normalizeColumnColor(value) {
@@ -658,6 +701,7 @@ function normalizeBoard(board) {
     columns: Array.isArray(board?.columns) ? structuredClone(board.columns) : structuredClone(defaultBoard.columns),
     cards: Array.isArray(board?.cards) ? structuredClone(board.cards) : [],
     deletedCards: normalizeDeletedCards(board?.deletedCards || board?.deletedCardIds),
+    archivedCards: normalizeArchivedCards(board?.archivedCards || board?.archive),
   };
   const usedColumnColors = new Set();
   nextBoard.columns = nextBoard.columns
@@ -686,6 +730,7 @@ function normalizeBoard(board) {
       createdAt: Number(card.createdAt) || now,
       updatedAt: Number(card.updatedAt) || Number(card.createdAt) || now,
     }));
+  nextBoard.archivedCards = normalizeArchivedCards(nextBoard.archivedCards).filter((card) => !deletedIds.has(card.id));
   nextBoard.columns.forEach((column) => {
     nextBoard.cards
       .filter((card) => card.columnId === column.id)
@@ -829,7 +874,7 @@ function renderBoardContent() {
     section.style.setProperty("--column-color", columnColor);
     section.addEventListener("dragover", onDragOver);
     section.addEventListener("drop", onDrop);
-    section.addEventListener("dragleave", handleDragLeave);
+    section.addEventListener("dragleave", onDragLeave);
 
     const header = document.createElement("div");
     header.className = "column-header";
@@ -844,6 +889,12 @@ function renderBoardContent() {
         <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку ${escapeHtml(safeColumn.title)}">✎</button>
       </div>
     `;
+    header.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("button:not(.column-color-handle)")) {
+        return;
+      }
+      startColumnDrag(event, safeColumn.id);
+    });
     section.appendChild(header);
 
     const list = document.createElement("div");
@@ -871,6 +922,13 @@ function renderBoardContent() {
     }
     section.appendChild(list);
 
+    const addCardButton = document.createElement("button");
+    addCardButton.className = "column-add-card";
+    addCardButton.type = "button";
+    addCardButton.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить карточку</strong>';
+    addCardButton.addEventListener("click", () => openCardSheet(null, safeColumn.id));
+    section.appendChild(addCardButton);
+
     const colorHandle = header.querySelector(".column-color-handle");
     colorHandle?.addEventListener("pointerdown", (event) => startColumnDrag(event, safeColumn.id));
     header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
@@ -878,6 +936,13 @@ function renderBoardContent() {
 
     boardEl.appendChild(section);
   });
+
+  const addColumnTile = document.createElement("button");
+  addColumnTile.className = "add-column-tile";
+  addColumnTile.type = "button";
+  addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Новая колонка</strong>';
+  addColumnTile.addEventListener("click", () => openColumnSheet());
+  boardEl.appendChild(addColumnTile);
 
   // Deadline reminders are temporarily disabled to keep auth and board sync stable.
 }
@@ -914,6 +979,12 @@ function renderBoardFallback() {
         <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку">✎</button>
       </div>
     `;
+    header.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("button:not(.column-color-handle)")) {
+        return;
+      }
+      startColumnDrag(event, columnId);
+    });
     section.appendChild(header);
 
     const list = document.createElement("div");
@@ -939,8 +1010,21 @@ function renderBoardFallback() {
     header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(columnId));
     header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(columnId));
     section.appendChild(list);
+    const addCardButton = document.createElement("button");
+    addCardButton.className = "column-add-card";
+    addCardButton.type = "button";
+    addCardButton.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить карточку</strong>';
+    addCardButton.addEventListener("click", () => openCardSheet(null, columnId));
+    section.appendChild(addCardButton);
     boardEl.appendChild(section);
   });
+
+  const addColumnTile = document.createElement("button");
+  addColumnTile.className = "add-column-tile";
+  addColumnTile.type = "button";
+  addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Новая колонка</strong>';
+  addColumnTile.addEventListener("click", () => openColumnSheet());
+  boardEl.appendChild(addColumnTile);
 }
 
 function getSafeStatusId(status, focus) {
@@ -972,8 +1056,17 @@ function createCardElement(card) {
   button.dataset.cardId = cardId;
   const status = getSafeStatusId(card?.status, card?.focus);
   const scheduleText = formatCardSchedule(card);
+  const canArchive = shouldShowArchiveAction(card, status);
   button.classList.add(`status-${status}`);
+  if (canArchive) {
+    button.classList.add("has-archive-action");
+  }
   button.innerHTML = `
+    ${
+      canArchive
+        ? '<span class="complete-action" role="button" tabindex="0" aria-label="Архивировать выполненное">✓</span>'
+        : ""
+    }
     <h3>${escapeHtml(title)}</h3>
     ${description ? `<p>${escapeHtml(description)}</p>` : ""}
     <div class="card-foot">
@@ -985,6 +1078,20 @@ function createCardElement(card) {
       ${card.focus ? '<span class="focus-dot" aria-label="В фокусе"></span>' : ""}
     </div>
   `;
+
+  const completeAction = button.querySelector(".complete-action");
+  completeAction?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    archiveCard(cardId, button);
+  });
+  completeAction?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      event.stopPropagation();
+      archiveCard(cardId, button);
+    }
+  });
 
   button.addEventListener("click", () => {
     if (Date.now() < suppressClickUntil) {
@@ -1013,6 +1120,12 @@ function createCardElement(card) {
     clearTextSelection();
   });
   return button;
+}
+
+function shouldShowArchiveAction(card, status = getSafeStatusId(card?.status, card?.focus)) {
+  const column = state.columns.find((item) => item.id === card?.columnId);
+  const title = String(column?.title || "").toLowerCase();
+  return status === "done" || title.includes("готов") || title.includes("сделано");
 }
 
 function getCardScheduleTime(card) {
@@ -3177,6 +3290,11 @@ function openSearchSheet() {
   focusFieldAtSheetStart(searchSheet, searchInput);
 }
 
+function openArchiveSheet() {
+  renderArchive();
+  openSheet(archiveSheet);
+}
+
 function openThemeSheet() {
   renderBackgroundChoices();
   syncThemeInputs(theme);
@@ -3401,6 +3519,76 @@ async function deleteActiveCard(event) {
   const savePromise = persist({ immediate: true });
   render();
   closeSheets();
+  await savePromise;
+}
+
+async function archiveCard(cardId, sourceElement = null) {
+  const card = state.cards.find((item) => item.id === cardId);
+  if (!card) {
+    return;
+  }
+
+  await animateCardToArchive(sourceElement);
+  const archivedAt = Date.now();
+  state.archivedCards = normalizeArchivedCards(state.archivedCards).filter((item) => item.id !== cardId);
+  state.archivedCards.unshift({
+    ...card,
+    archivedAt,
+    archivedFromColumnId: card.columnId,
+    status: "done",
+    updatedAt: archivedAt,
+  });
+  state.cards = state.cards.filter((item) => item.id !== cardId);
+  state = normalizeBoard(state);
+  const savePromise = persist({ immediate: true });
+  render();
+  await savePromise;
+}
+
+function animateCardToArchive(sourceElement) {
+  if (!sourceElement || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+    return Promise.resolve();
+  }
+
+  const clone = sourceElement.cloneNode(true);
+  const rect = sourceElement.getBoundingClientRect();
+  clone.classList.add("archive-flight");
+  clone.style.left = `${rect.left}px`;
+  clone.style.top = `${rect.top}px`;
+  clone.style.width = `${rect.width}px`;
+  document.body.appendChild(clone);
+  sourceElement.classList.add("is-archiving");
+
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      clone.classList.add("is-flying");
+      window.setTimeout(() => {
+        clone.remove();
+        resolve();
+      }, 520);
+    });
+  });
+}
+
+async function restoreArchivedCard(cardId) {
+  const archivedCard = normalizeArchivedCards(state.archivedCards).find((card) => card.id === cardId);
+  if (!archivedCard) {
+    return;
+  }
+  const columnId = getSafeColumnValue(archivedCard.archivedFromColumnId, archivedCard.columnId, quickColumnId);
+  const restoredAt = Date.now();
+  state.archivedCards = normalizeArchivedCards(state.archivedCards).filter((card) => card.id !== cardId);
+  state.cards.push({
+    ...archivedCard,
+    columnId,
+    order: getNextOrder(columnId),
+    status: archivedCard.status || "done",
+    updatedAt: restoredAt,
+  });
+  state = normalizeBoard(state);
+  const savePromise = persist({ immediate: true });
+  render();
+  renderArchive();
   await savePromise;
 }
 
@@ -3889,6 +4077,42 @@ function renderSearch() {
     result.addEventListener("click", () => openCardSheet(card.id));
     searchResults.append(result);
   });
+}
+
+function renderArchive() {
+  if (!archiveList) {
+    return;
+  }
+  const archivedCards = normalizeArchivedCards(state.archivedCards).sort(
+    (a, b) => Number(b.archivedAt || 0) - Number(a.archivedAt || 0),
+  );
+  archiveList.innerHTML = "";
+  if (!archivedCards.length) {
+    archiveList.innerHTML = '<div class="empty-state">В архиве пока пусто</div>';
+    return;
+  }
+
+  archivedCards.forEach((card) => {
+    const item = document.createElement("article");
+    item.className = "archive-item";
+    const column = state.columns.find(
+      (candidate) => candidate.id === (card.archivedFromColumnId || card.columnId),
+    );
+    item.innerHTML = `
+      <div>
+        <strong>${escapeHtml(card.title)}</strong>
+        <span>${escapeHtml(column?.title || "Колонка")} · ${formatArchiveDate(card.archivedAt)}</span>
+      </div>
+      <button class="ghost-button archive-restore" type="button">Вернуть</button>
+    `;
+    item.querySelector(".archive-restore")?.addEventListener("click", () => restoreArchivedCard(card.id));
+    archiveList.append(item);
+  });
+}
+
+function formatArchiveDate(value) {
+  const date = new Date(Number(value) || Date.now());
+  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
 }
 
 function onDragOver(event) {
