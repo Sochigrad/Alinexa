@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-status-add-auth-1";
+const APP_BUILD_ID = "20260608-mobile-auth-status-2";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -335,7 +335,8 @@ function bindReliableTap(button, handler) {
 }
 
 function bindAccountButton() {
-  if (!accountButton) {
+  const accountCluster = document.querySelector(".account-cluster");
+  if (!accountButton && !accountCluster) {
     return;
   }
   let lastRunAt = 0;
@@ -351,9 +352,11 @@ function bindAccountButton() {
     event?.stopPropagation?.();
     openAuthSheet();
   };
-  accountButton.addEventListener("pointerdown", openAccount, { passive: false });
-  accountButton.addEventListener("click", openAccount);
-  accountButton.addEventListener("touchend", openAccount, { passive: false });
+  [accountButton, accountName, accountCluster].filter(Boolean).forEach((target) => {
+    target.addEventListener("pointerdown", openAccount, { passive: false });
+    target.addEventListener("touchstart", openAccount, { passive: false });
+    target.addEventListener("click", openAccount);
+  });
 }
 
 let lastCriticalActionAt = 0;
@@ -4516,7 +4519,7 @@ function moveCardToPosition(cardId, columnId, dropIndex) {
   const otherCards = state.cards.filter((card) => card.id !== cardId);
   const targetCards = otherCards.filter((card) => card.columnId === columnId).sort(sortCards);
   const safeIndex = Math.max(0, Math.min(dropIndex ?? targetCards.length, targetCards.length));
-  const movedCard = { ...movingCard, columnId, updatedAt: changedAt };
+  const movedCard = { ...movingCard, columnId, status: getStatusForColumn(movingCard, columnId), updatedAt: changedAt };
   targetCards.splice(safeIndex, 0, movedCard);
 
   const reorderedTargetCards = targetCards.map((card, index) => ({ ...card, order: index, updatedAt: changedAt }));
@@ -4527,7 +4530,9 @@ function moveCardToPosition(cardId, columnId, dropIndex) {
   state = normalizeBoard(state);
   const affectedColumns = new Set([sourceColumnId, columnId]);
   state.cards = state.cards.map((card) =>
-    affectedColumns.has(card.columnId) ? { ...card, updatedAt: changedAt } : card,
+    affectedColumns.has(card.columnId)
+      ? { ...card, status: getStatusForColumn(card, card.columnId), updatedAt: changedAt }
+      : card,
   );
 }
 
