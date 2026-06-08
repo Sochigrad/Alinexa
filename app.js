@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-column-drag-2";
+const APP_BUILD_ID = "20260608-mobile-card-drag-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -177,7 +177,7 @@ let longPressTimer = null;
 let pendingTouch = null;
 let touchDrag = null;
 let nativeDrag = null;
-const TOUCH_LONG_PRESS_MS = 340;
+const TOUCH_LONG_PRESS_MS = 240;
 const TOUCH_SCROLL_CANCEL_PX = 18;
 const TOUCH_MOUSE_DRAG_PX = 4;
 let suppressClickUntil = 0;
@@ -1138,6 +1138,7 @@ function createCardElement(card) {
     button.classList.add("has-archive-action");
   }
   button.innerHTML = `
+    <span class="card-drag-handle" role="button" tabindex="-1" aria-label="Перетащить карточку">⋮⋮</span>
     ${
       canArchive
         ? '<span class="complete-action" role="button" tabindex="0" aria-label="Архивировать выполненное">✓</span>'
@@ -1156,7 +1157,9 @@ function createCardElement(card) {
   `;
 
   const completeAction = button.querySelector(".complete-action");
+  const dragHandle = button.querySelector(".card-drag-handle");
   bindArchiveCompleteAction(completeAction, cardId, button);
+  bindCardDragHandle(dragHandle, button, cardId);
 
   button.addEventListener("click", () => {
     if (Date.now() < suppressClickUntil) {
@@ -1496,7 +1499,41 @@ function updateCardReminderStatus() {
   cardReminderStatus.textContent = "";
 }
 
-function prepareTouchDrag(event, cardEl, cardId) {
+function bindCardDragHandle(handleEl, cardEl, cardId) {
+  if (!handleEl) {
+    return;
+  }
+
+  const startFromPointer = (event) => {
+    if (event.pointerType === "touch") {
+      return;
+    }
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    prepareTouchDrag(event, cardEl, cardId, { immediate: true, fromHandle: true });
+  };
+
+  const startFromTouch = (event) => {
+    if (event.touches?.length !== 1) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    prepareTouchDragByTouch(event, cardEl, cardId, { immediate: true, fromHandle: true });
+  };
+
+  handleEl.addEventListener("pointerdown", startFromPointer, { passive: false });
+  handleEl.addEventListener("touchstart", startFromTouch, { passive: false });
+  handleEl.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+}
+
+function prepareTouchDrag(event, cardEl, cardId, options = {}) {
   if (event.pointerType === "touch") {
     return;
   }
@@ -1529,7 +1566,9 @@ function prepareTouchDrag(event, cardEl, cardId) {
     }
   }
 
-  if (event.pointerType !== "mouse") {
+  if (options.immediate) {
+    startTouchDrag(event);
+  } else if (event.pointerType !== "mouse") {
     longPressTimer = setTimeout(() => {
       if (pendingTouch?.pointerId === event.pointerId) {
         startTouchDrag();
@@ -1542,7 +1581,7 @@ function getPrimaryTouch(event) {
   return event.touches?.[0] || event.changedTouches?.[0] || null;
 }
 
-function prepareTouchDragByTouch(event, cardEl, cardId) {
+function prepareTouchDragByTouch(event, cardEl, cardId, options = {}) {
   if (event.touches?.length !== 1) {
     return;
   }
@@ -1567,6 +1606,11 @@ function prepareTouchDragByTouch(event, cardEl, cardId) {
     offsetY: touch.clientY - rect.top,
     width: rect.width,
   };
+
+  if (options.immediate) {
+    startTouchDrag({ clientX: touch.clientX, clientY: touch.clientY });
+    return;
+  }
 
   longPressTimer = setTimeout(() => {
     if (pendingTouch?.pointerId === touch.identifier) {
