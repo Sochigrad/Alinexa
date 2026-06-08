@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260608-safe-merge-1";
+self.__ALINEXA_SW_VERSION__ = "20260608-data-guard-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
