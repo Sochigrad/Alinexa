@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-plus-column-1";
+const APP_BUILD_ID = "20260608-archive-header-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -1080,18 +1080,7 @@ function createCardElement(card) {
   `;
 
   const completeAction = button.querySelector(".complete-action");
-  completeAction?.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    archiveCard(cardId, button);
-  });
-  completeAction?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      event.stopPropagation();
-      archiveCard(cardId, button);
-    }
-  });
+  bindArchiveCompleteAction(completeAction, cardId, button);
 
   button.addEventListener("click", () => {
     if (Date.now() < suppressClickUntil) {
@@ -1120,6 +1109,49 @@ function createCardElement(card) {
     clearTextSelection();
   });
   return button;
+}
+
+function bindArchiveCompleteAction(actionEl, cardId, cardEl) {
+  if (!actionEl) {
+    return;
+  }
+
+  let lastRunAt = 0;
+  const run = (event) => {
+    const now = Date.now();
+    if (now - lastRunAt < 450) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      return;
+    }
+    lastRunAt = now;
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    pendingTouch = null;
+    clearTimeout(longPressTimer);
+    archiveCard(cardId, cardEl);
+  };
+
+  actionEl.draggable = false;
+  actionEl.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  actionEl.addEventListener("touchstart", (event) => {
+    event.stopPropagation();
+  }, { passive: true });
+  actionEl.addEventListener("pointerup", run);
+  actionEl.addEventListener("touchend", run, { passive: false });
+  actionEl.addEventListener("click", run);
+  actionEl.addEventListener("dragstart", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  actionEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      run(event);
+    }
+  });
 }
 
 function shouldShowArchiveAction(card, status = getSafeStatusId(card?.status, card?.focus)) {
