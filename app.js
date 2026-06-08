@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-yandex-favicon-1";
+const APP_BUILD_ID = "20260608-safe-merge-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -2156,7 +2156,7 @@ async function initAuth() {
       return;
     }
     if (currentUser && event === "SIGNED_IN") {
-      await loadRemoteWorkspace({ mergeLocalData: false });
+      await loadRemoteWorkspace({ mergeLocalData: true });
       hasLoadedRemoteWorkspace = true;
       startRemoteSync();
       if (arrivedFromSignupConfirmation || hasSignupConfirmationUrl()) {
@@ -2179,7 +2179,7 @@ async function initAuth() {
   currentUser = data.session?.user || null;
   updateAuthUi(currentUser);
   if (currentUser) {
-    await loadRemoteWorkspace({ mergeLocalData: false });
+    await loadRemoteWorkspace({ mergeLocalData: true });
     hasLoadedRemoteWorkspace = true;
     startRemoteSync();
   }
@@ -2619,7 +2619,7 @@ async function syncRemoteWorkspace() {
   }
 
   if (!isSavingRemoteWorkspace) {
-    await loadRemoteWorkspace({ mergeLocalData: false });
+    await loadRemoteWorkspace({ mergeLocalData: true });
   }
 }
 
@@ -2846,7 +2846,7 @@ async function signInWithEmail(event) {
   currentUser = data?.user || data?.session?.user || null;
   if (currentUser) {
     updateAuthUi(currentUser);
-    await loadRemoteWorkspace({ mergeLocalData: false });
+    await loadRemoteWorkspace({ mergeLocalData: true });
     hasLoadedRemoteWorkspace = true;
     startRemoteSync();
   }
@@ -2894,7 +2894,7 @@ async function signUpWithEmail(event) {
     currentUser = data.session.user;
     currentSession = data.session;
     updateAuthUi(currentUser);
-    await loadRemoteWorkspace({ mergeLocalData: false });
+    await loadRemoteWorkspace({ mergeLocalData: true });
     hasLoadedRemoteWorkspace = true;
     startRemoteSync();
     setAuthMode("sign-in");
