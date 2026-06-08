@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260608-root-favicon-1";
+self.__ALINEXA_SW_VERSION__ = "20260608-yandex-favicon-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
