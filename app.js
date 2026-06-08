@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-column-delete-done-green-1";
+const APP_BUILD_ID = "20260608-status-add-auth-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -334,6 +334,28 @@ function bindReliableTap(button, handler) {
   });
 }
 
+function bindAccountButton() {
+  if (!accountButton) {
+    return;
+  }
+  let lastRunAt = 0;
+  const openAccount = (event) => {
+    const now = Date.now();
+    if (now - lastRunAt < 280) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      return;
+    }
+    lastRunAt = now;
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    openAuthSheet();
+  };
+  accountButton.addEventListener("pointerdown", openAccount, { passive: false });
+  accountButton.addEventListener("click", openAccount);
+  accountButton.addEventListener("touchend", openAccount, { passive: false });
+}
+
 let lastCriticalActionAt = 0;
 let lastCriticalActionId = "";
 
@@ -389,7 +411,7 @@ document.querySelector("#closeThemeButton").addEventListener("click", closeSheet
 document.querySelector("#closeVoiceButton").addEventListener("click", closeSheets);
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
 document.querySelector("#closeAuthButton").addEventListener("click", closeSheets);
-bindReliableTap(accountButton, openAuthSheet);
+bindAccountButton();
 bindReliableTap(welcomeSignUpButton, openRegistrationSheet);
 bindReliableTap(welcomeSignInButton, openAuthSheet);
 bindReliableTap(document.querySelector("#signInButton"), handleAuthSubmit);
@@ -811,10 +833,11 @@ function normalizeBoard(board) {
     .filter((card) => card?.id && !deletedIds.has(card.id) && !deletedColumnIds.has(String(card.columnId || "")))
     .map((card, index) => {
       const columnId = columnIds.has(card.columnId) ? card.columnId : fallbackColumnId;
+      const status = getSafeStatusId(card.status, card.focus);
       return {
         ...card,
         columnId,
-        status: doneColumnIds.has(columnId) ? "done" : getSafeStatusId(card.status, card.focus),
+        status: doneColumnIds.has(columnId) ? "done" : status === "done" ? (card.focus ? "today" : "planned") : status,
         order: Number.isFinite(card.order) ? card.order : index,
         createdAt: Number(card.createdAt) || now,
         updatedAt: Number(card.updatedAt) || Number(card.createdAt) || now,
@@ -1139,6 +1162,15 @@ function getSafeStatusId(status, focus) {
 function isDoneColumn(column) {
   const title = String(column?.title || "").toLowerCase();
   return title.includes("готов") || title.includes("сделано");
+}
+
+function getStatusForColumn(card, columnId) {
+  const column = state.columns.find((item) => item.id === columnId);
+  const status = getSafeStatusId(card?.status, card?.focus);
+  if (isDoneColumn(column)) {
+    return "done";
+  }
+  return status === "done" ? (card?.focus ? "today" : "planned") : status;
 }
 
 function getSafeLabelId(labelId) {
@@ -3703,9 +3735,7 @@ async function saveCard(event) {
     reminderEnabled,
     updatedAt: changedAt,
   };
-  if (isDoneColumn(state.columns.find((column) => column.id === payload.columnId))) {
-    payload.status = "done";
-  }
+  payload.status = getStatusForColumn(payload, payload.columnId);
 
   if (!payload.title) {
     return;
