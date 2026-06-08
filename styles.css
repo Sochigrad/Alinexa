@@ -115,6 +115,8 @@ body:not(.is-authenticated) .topbar {
 }
 
 .topbar {
+  position: relative;
+  z-index: 30;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
@@ -169,6 +171,8 @@ body:not(.is-authenticated) .topbar {
 }
 
 .account-name {
+  position: relative;
+  z-index: 31;
   display: inline-flex;
   max-width: min(44vw, 260px);
   padding: 5px 8px;
@@ -180,14 +184,22 @@ body:not(.is-authenticated) .topbar {
   font-weight: 850;
   line-height: 1.2;
   overflow-wrap: anywhere;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .account-cluster {
+  position: relative;
+  z-index: 31;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
   order: 3;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .archive-button {
@@ -233,6 +245,11 @@ body:not(.is-authenticated) .topbar {
 .avatar-button {
   font-size: 12px;
   font-weight: 900;
+  position: relative;
+  z-index: 31;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .welcome-screen {
@@ -1783,6 +1800,12 @@ textarea {
 
   .topbar {
     padding: 14px 14px 8px;
+  }
+
+  .account-cluster {
+    min-height: 56px;
+    padding: 4px;
+    margin: -4px;
   }
 
   .brand {
