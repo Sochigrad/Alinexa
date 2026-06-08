@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260608-archive-header-1";
+self.__ALINEXA_SW_VERSION__ = "20260608-clean-logo-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
