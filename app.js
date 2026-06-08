@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-data-guard-1";
+const APP_BUILD_ID = "20260608-delete-sync-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -627,6 +627,15 @@ function hasUserBoardContent(board = state) {
 
   const defaultTitles = new Set(defaultBoard.cards.map((card) => card.title));
   return board.cards.some((card) => !defaultTitles.has(card.title));
+}
+
+function hasBoardSyncContent(board = state) {
+  const normalizedBoard = normalizeBoard(board);
+  return (
+    hasUserBoardContent(normalizedBoard) ||
+    normalizeArchivedCards(normalizedBoard.archivedCards).length > 0 ||
+    Object.keys(normalizedBoard.deletedCards || {}).length > 0
+  );
 }
 
 function areBoardsEqual(firstBoard, secondBoard) {
@@ -2624,11 +2633,11 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   isApplyingRemoteWorkspace = true;
   const localBoard = normalizeBoard(state);
   const remoteBoard = data.board?.columns && data.board?.cards ? normalizeBoard(data.board) : null;
-  if (hasUserBoardContent(localBoard) || normalizeArchivedCards(localBoard.archivedCards).length) {
+  if (hasBoardSyncContent(localBoard)) {
     saveRecoveryBackup("before-remote-apply", localBoard);
   }
-  const localHasContent = mergeLocalData && hasUserBoardContent(localBoard);
-  const remoteHasContent = remoteBoard && hasUserBoardContent(remoteBoard);
+  const localHasContent = mergeLocalData && hasBoardSyncContent(localBoard);
+  const remoteHasContent = remoteBoard && hasBoardSyncContent(remoteBoard);
   const shouldMerge = Boolean(
     localHasContent && remoteHasContent && remoteBoard && !areBoardsEqual(localBoard, remoteBoard),
   );
@@ -2787,13 +2796,16 @@ async function saveRemoteWorkspace() {
   isSavingRemoteWorkspace = true;
   try {
     const boardToSave = normalizeBoard(state);
-    if (!hasUserBoardContent(boardToSave) && !normalizeArchivedCards(boardToSave.archivedCards).length) {
+    const boardHasDeletedCards = Object.keys(boardToSave.deletedCards || {}).length > 0;
+    if (
+      !hasUserBoardContent(boardToSave) &&
+      !normalizeArchivedCards(boardToSave.archivedCards).length &&
+      !boardHasDeletedCards
+    ) {
       const { data: existingData, error: existingError } = await fetchRemoteWorkspace("board,updated_at");
       const existingBoard =
         existingData?.board?.columns && existingData?.board?.cards ? normalizeBoard(existingData.board) : null;
-      const existingHasContent =
-        existingBoard &&
-        (hasUserBoardContent(existingBoard) || normalizeArchivedCards(existingBoard.archivedCards).length);
+      const existingHasContent = existingBoard && hasBoardSyncContent(existingBoard);
       if (!existingError && existingHasContent) {
       saveRecoveryBackup("blocked-empty-save", boardToSave);
       state = existingBoard;
