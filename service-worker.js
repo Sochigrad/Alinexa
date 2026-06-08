@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260608-trello-flow-1";
+self.__ALINEXA_SW_VERSION__ = "20260608-plus-column-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
