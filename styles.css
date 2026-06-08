@@ -118,6 +118,30 @@ body:not(.is-authenticated) .topbar {
   margin: 0;
 }
 
+.brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.brand-logo {
+  display: block;
+  width: min(48vw, 212px);
+  max-height: 56px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.brand p,
+.brand h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .brand p {
   color: var(--accent);
   font-size: 12px;
@@ -208,15 +232,22 @@ body:not(.is-authenticated) .topbar {
 .welcome-kicker {
   display: grid;
   justify-items: center;
-  gap: 4px;
   margin: 0;
   max-width: min(100%, 780px);
   color: #0b1726;
   letter-spacing: 0;
 }
 
-.welcome-kicker-small {
+.welcome-logo {
   display: block;
+  width: min(88vw, 720px);
+  max-height: clamp(132px, 28vw, 260px);
+  object-fit: contain;
+  filter: drop-shadow(0 18px 34px rgba(15, 23, 42, 0.08));
+}
+
+.welcome-kicker-small {
+  display: none;
   color: var(--accent);
   font-size: clamp(18px, 5.2vw, 30px);
   font-weight: 900;
@@ -225,7 +256,7 @@ body:not(.is-authenticated) .topbar {
 }
 
 .welcome-kicker-brand {
-  display: block;
+  display: none;
   color: #0b1726;
   font-size: clamp(48px, 15vw, 86px);
   font-weight: 950;
@@ -1346,9 +1377,13 @@ textarea {
   }
 
   .brand {
-    display: grid;
-    align-items: start;
-    gap: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .brand-logo {
+    width: 236px;
+    max-height: 62px;
   }
 
   .brand p {
@@ -1372,7 +1407,12 @@ textarea {
   }
 
   .welcome-kicker {
-    gap: 6px;
+    max-width: min(100%, 820px);
+  }
+
+  .welcome-logo {
+    width: min(72vw, 760px);
+    max-height: 270px;
   }
 
   .welcome-kicker-small {
