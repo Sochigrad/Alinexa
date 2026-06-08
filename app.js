@@ -3,8 +3,10 @@ const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
+const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
+const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-safe-merge-1";
+const APP_BUILD_ID = "20260608-data-guard-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -503,6 +505,7 @@ document.querySelectorAll("[data-preset]").forEach((button) => {
 
 applyTheme(theme);
 render();
+saveRecoveryBackup("page-load", state);
 updateVisualViewportHeight();
 initServiceWorker();
 initAuth().catch(() => {
@@ -549,6 +552,64 @@ function safeScheduleCardReminders() {
 function markLocalWorkspaceChanged() {
   localWorkspaceUpdatedAt = Date.now();
   localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
+}
+
+function loadRecoveryBackups() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECOVERY_BACKUPS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item) => item?.id && item?.board) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecoveryBackup(reason = "snapshot", board = state) {
+  try {
+    const normalizedBoard = normalizeBoard(board);
+    if (!hasUserBoardContent(normalizedBoard) && !normalizeArchivedCards(normalizedBoard.archivedCards).length) {
+      return;
+    }
+    const backups = loadRecoveryBackups();
+    const snapshot = {
+      id: crypto.randomUUID?.() || `backup-${Date.now()}`,
+      reason,
+      createdAt: Date.now(),
+      board: normalizedBoard,
+      theme: normalizeTheme(theme),
+      labels: Array.isArray(labels)
+        ? labels.map((label, index) => normalizeLabelObject(label, index)).filter(Boolean)
+        : structuredClone(defaultLabels),
+    };
+    backups.unshift(snapshot);
+    localStorage.setItem(RECOVERY_BACKUPS_KEY, JSON.stringify(backups.slice(0, MAX_RECOVERY_BACKUPS)));
+  } catch (error) {
+    console.warn("Alinexa recovery backup skipped", error);
+  }
+}
+
+async function restoreRecoveryBackup(backupId) {
+  const backup = loadRecoveryBackups().find((item) => item.id === backupId);
+  if (!backup?.board) {
+    return;
+  }
+  saveRecoveryBackup("before-recovery-restore", state);
+  state = normalizeBoard(backup.board);
+  theme = normalizeTheme(backup.theme || theme);
+  labels = Array.isArray(backup.labels)
+    ? backup.labels.map((label, index) => normalizeLabelObject(label, index)).filter(Boolean)
+    : labels;
+  if (!labels.length) {
+    labels = structuredClone(defaultLabels);
+  }
+  quickColumnId = state.columns[0]?.id || "";
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+  localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
+  markLocalWorkspaceChanged();
+  applyTheme(theme);
+  render();
+  renderArchive();
+  await persist({ immediate: true });
 }
 
 function hasLocalWorkspaceContent() {
@@ -2548,6 +2609,7 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   }
 
   if (!data) {
+    saveRecoveryBackup("before-empty-remote-init", state);
     isApplyingRemoteWorkspace = true;
     state = createPrivateEmptyBoard();
     quickColumnId = state.columns[0]?.id || "";
@@ -2562,6 +2624,9 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   isApplyingRemoteWorkspace = true;
   const localBoard = normalizeBoard(state);
   const remoteBoard = data.board?.columns && data.board?.cards ? normalizeBoard(data.board) : null;
+  if (hasUserBoardContent(localBoard) || normalizeArchivedCards(localBoard.archivedCards).length) {
+    saveRecoveryBackup("before-remote-apply", localBoard);
+  }
   const localHasContent = mergeLocalData && hasUserBoardContent(localBoard);
   const remoteHasContent = remoteBoard && hasUserBoardContent(remoteBoard);
   const shouldMerge = Boolean(
@@ -2721,7 +2786,27 @@ async function saveRemoteWorkspace() {
   remoteSaveTimer = null;
   isSavingRemoteWorkspace = true;
   try {
-  const boardToSave = normalizeBoard(state);
+    const boardToSave = normalizeBoard(state);
+    if (!hasUserBoardContent(boardToSave) && !normalizeArchivedCards(boardToSave.archivedCards).length) {
+      const { data: existingData, error: existingError } = await fetchRemoteWorkspace("board,updated_at");
+      const existingBoard =
+        existingData?.board?.columns && existingData?.board?.cards ? normalizeBoard(existingData.board) : null;
+      const existingHasContent =
+        existingBoard &&
+        (hasUserBoardContent(existingBoard) || normalizeArchivedCards(existingBoard.archivedCards).length);
+      if (!existingError && existingHasContent) {
+      saveRecoveryBackup("blocked-empty-save", boardToSave);
+      state = existingBoard;
+      quickColumnId = state.columns[0]?.id || "";
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      remoteWorkspaceUpdatedAt = existingData.updated_at || remoteWorkspaceUpdatedAt;
+      hasUnsavedLocalChanges = false;
+      render();
+      setAuthStatus("Защита данных: пустая доска не перезаписала облако. Я восстановила карточки из облака.", "success");
+      return;
+    }
+  }
+  saveRecoveryBackup("before-remote-save", boardToSave);
   const themeToSave = await getRemoteSafeTheme();
   const saveStartedAt = Date.now();
   const payload = {
@@ -3164,6 +3249,7 @@ async function signOut(event) {
 }
 
 function clearPrivateWorkspaceFromThisDevice() {
+  saveRecoveryBackup("before-device-clear", state);
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
   stopRemoteSync();
@@ -4115,14 +4201,32 @@ function renderArchive() {
   if (!archiveList) {
     return;
   }
+  const backups = loadRecoveryBackups();
   const archivedCards = normalizeArchivedCards(state.archivedCards).sort(
     (a, b) => Number(b.archivedAt || 0) - Number(a.archivedAt || 0),
   );
   archiveList.innerHTML = "";
-  if (!archivedCards.length) {
+  if (!backups.length && !archivedCards.length) {
     archiveList.innerHTML = '<div class="empty-state">В архиве пока пусто</div>';
     return;
   }
+
+  backups.forEach((backup) => {
+    const item = document.createElement("article");
+    item.className = "archive-item";
+    const board = normalizeBoard(backup.board);
+    const activeCount = board.cards.length;
+    const archivedCount = normalizeArchivedCards(board.archivedCards).length;
+    item.innerHTML = `
+      <div>
+        <strong>Резервная копия</strong>
+        <span>${formatArchiveDate(backup.createdAt)} · ${activeCount} карточек · ${archivedCount} в архиве</span>
+      </div>
+      <button class="ghost-button archive-restore" type="button">Восстановить</button>
+    `;
+    item.querySelector(".archive-restore")?.addEventListener("click", () => restoreRecoveryBackup(backup.id));
+    archiveList.append(item);
+  });
 
   archivedCards.forEach((card) => {
     const item = document.createElement("article");
