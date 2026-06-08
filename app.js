@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-mobile-auth-status-2";
+const APP_BUILD_ID = "20260608-mobile-account-tap-3";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -341,22 +341,33 @@ function bindAccountButton() {
   }
   let lastRunAt = 0;
   const openAccount = (event) => {
+    const target = event?.target?.closest?.("#accountButton,#accountName,.account-cluster");
+    if (event && !target) {
+      return;
+    }
     const now = Date.now();
     if (now - lastRunAt < 280) {
       event?.preventDefault?.();
       event?.stopPropagation?.();
+      event?.stopImmediatePropagation?.();
       return;
     }
     lastRunAt = now;
     event?.preventDefault?.();
     event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
     openAuthSheet();
   };
+  window.openAlinexaAccount = openAccount;
   [accountButton, accountName, accountCluster].filter(Boolean).forEach((target) => {
     target.addEventListener("pointerdown", openAccount, { passive: false });
     target.addEventListener("touchstart", openAccount, { passive: false });
+    target.addEventListener("touchend", openAccount, { passive: false });
     target.addEventListener("click", openAccount);
   });
+  document.addEventListener("pointerdown", openAccount, { passive: false, capture: true });
+  document.addEventListener("touchend", openAccount, { passive: false, capture: true });
+  document.addEventListener("click", openAccount, { capture: true });
 }
 
 let lastCriticalActionAt = 0;
