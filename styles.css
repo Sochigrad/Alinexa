@@ -565,8 +565,7 @@ body.is-column-dragging * {
   text-align: left;
 }
 
-.column-add-card span,
-.add-column-tile span {
+.column-add-card span {
   display: grid;
   width: 24px;
   height: 24px;
@@ -585,17 +584,40 @@ body.is-column-dragging * {
 }
 
 .add-column-tile {
-  display: flex;
+  display: grid;
   align-items: center;
-  gap: 10px;
-  min-height: 64px;
+  justify-items: center;
+  gap: 12px;
+  min-height: 220px;
   align-self: start;
   border: 1px dashed color-mix(in srgb, var(--accent) 34%, var(--line));
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
   color: var(--accent-strong);
-  padding: 14px;
+  padding: 24px 18px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  text-align: center;
+}
+
+.add-column-tile span {
+  display: grid;
+  width: 92px;
+  height: 92px;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.9), transparent 30%),
+    color-mix(in srgb, var(--accent) 18%, white);
+  color: var(--accent-strong);
+  font-size: 58px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 18px 34px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.add-column-tile strong {
+  font-size: 17px;
+  line-height: 1.2;
 }
 
 .card-list {
