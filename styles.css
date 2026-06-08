@@ -604,6 +604,7 @@ body.is-column-dragging * {
   gap: 12px;
   min-height: 220px;
   align-self: start;
+  scroll-snap-align: start;
   border: 1px dashed color-mix(in srgb, var(--accent) 34%, var(--line));
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 68%, transparent);
@@ -1827,6 +1828,12 @@ textarea {
     max-height: calc(100svh - 212px);
     min-height: 0;
     scroll-snap-align: start;
+  }
+
+  .add-column-tile {
+    min-height: calc(100svh - 212px);
+    align-self: stretch;
+    align-content: center;
   }
 
   .card-list {
