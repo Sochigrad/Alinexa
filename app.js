@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-mobile-card-drag-1";
+const APP_BUILD_ID = "20260608-column-delete-done-green-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -154,6 +154,7 @@ const defaultBoard = {
       createdAt: Date.now() - 1000,
     },
   ],
+  deletedColumns: {},
   deletedCards: {},
   archivedCards: [],
 };
@@ -162,6 +163,7 @@ function createPrivateEmptyBoard() {
   return normalizeBoard({
     columns: structuredClone(defaultBoard.columns),
     cards: [],
+    deletedColumns: {},
     deletedCards: {},
     archivedCards: [],
   });
@@ -566,7 +568,7 @@ function loadRecoveryBackups() {
 function saveRecoveryBackup(reason = "snapshot", board = state) {
   try {
     const normalizedBoard = normalizeBoard(board);
-    if (!hasUserBoardContent(normalizedBoard) && !normalizeArchivedCards(normalizedBoard.archivedCards).length) {
+    if (!hasBoardSyncContent(normalizedBoard)) {
       return;
     }
     const backups = loadRecoveryBackups();
@@ -634,6 +636,7 @@ function hasBoardSyncContent(board = state) {
   return (
     hasUserBoardContent(normalizedBoard) ||
     normalizeArchivedCards(normalizedBoard.archivedCards).length > 0 ||
+    Object.keys(normalizedBoard.deletedColumns || {}).length > 0 ||
     Object.keys(normalizedBoard.deletedCards || {}).length > 0
   );
 }
@@ -649,6 +652,10 @@ function mergeBoards(localBoard, remoteBoard) {
     ...normalizedRemote.deletedCards,
     ...normalizedLocal.deletedCards,
   };
+  const deletedColumns = {
+    ...normalizedRemote.deletedColumns,
+    ...normalizedLocal.deletedColumns,
+  };
   const archiveMap = new Map();
   [...(normalizedRemote.archivedCards || []), ...(normalizedLocal.archivedCards || [])].forEach((card) => {
     if (!card?.id) {
@@ -661,9 +668,10 @@ function mergeBoards(localBoard, remoteBoard) {
   });
   const archivedIds = new Set(archiveMap.keys());
   const deletedIds = new Set(Object.keys(deletedCards));
+  const deletedColumnIds = new Set(Object.keys(deletedColumns));
   const columnMap = new Map();
   [...normalizedRemote.columns, ...normalizedLocal.columns].forEach((column) => {
-    if (!column?.id || columnMap.has(column.id)) {
+    if (!column?.id || deletedColumnIds.has(column.id) || columnMap.has(column.id)) {
       return;
     }
     columnMap.set(column.id, { ...column });
@@ -671,7 +679,7 @@ function mergeBoards(localBoard, remoteBoard) {
 
   const cardMap = new Map();
   [...normalizedRemote.cards, ...normalizedLocal.cards].forEach((card) => {
-    if (!card?.id || deletedIds.has(card.id) || archivedIds.has(card.id)) {
+    if (!card?.id || deletedIds.has(card.id) || deletedColumnIds.has(card.columnId) || archivedIds.has(card.id)) {
       return;
     }
     const previousCard = cardMap.get(card.id);
@@ -689,6 +697,7 @@ function mergeBoards(localBoard, remoteBoard) {
   return normalizeBoard({
     columns: [...columnMap.values()],
     cards,
+    deletedColumns,
     deletedCards,
     archivedCards: [...archiveMap.values()],
   });
@@ -717,6 +726,10 @@ function normalizeDeletedCards(value) {
     );
   }
   return {};
+}
+
+function normalizeDeletedColumns(value) {
+  return normalizeDeletedCards(value);
 }
 
 function normalizeArchivedCards(value) {
@@ -770,12 +783,14 @@ function normalizeBoard(board) {
   const nextBoard = {
     columns: Array.isArray(board?.columns) ? structuredClone(board.columns) : structuredClone(defaultBoard.columns),
     cards: Array.isArray(board?.cards) ? structuredClone(board.cards) : [],
+    deletedColumns: normalizeDeletedColumns(board?.deletedColumns || board?.deletedColumnIds),
     deletedCards: normalizeDeletedCards(board?.deletedCards || board?.deletedCardIds),
     archivedCards: normalizeArchivedCards(board?.archivedCards || board?.archive),
   };
+  const deletedColumnIds = new Set(Object.keys(nextBoard.deletedColumns));
   const usedColumnColors = new Set();
   nextBoard.columns = nextBoard.columns
-    .filter((column) => column?.id && column?.title)
+    .filter((column) => column?.id && column?.title && !deletedColumnIds.has(String(column.id)))
     .map((column, index) => {
       const color = pickColumnColor(column, index, usedColumnColors);
       usedColumnColors.add(color.toLowerCase());
@@ -791,15 +806,20 @@ function normalizeBoard(board) {
   const columnIds = new Set(nextBoard.columns.map((column) => column.id));
   const fallbackColumnId = nextBoard.columns[0]?.id || defaultBoard.columns[0]?.id || "";
   const deletedIds = new Set(Object.keys(nextBoard.deletedCards));
+  const doneColumnIds = new Set(nextBoard.columns.filter(isDoneColumn).map((column) => column.id));
   nextBoard.cards = nextBoard.cards
-    .filter((card) => card?.id && !deletedIds.has(card.id))
-    .map((card, index) => ({
-      ...card,
-      columnId: columnIds.has(card.columnId) ? card.columnId : fallbackColumnId,
-      order: Number.isFinite(card.order) ? card.order : index,
-      createdAt: Number(card.createdAt) || now,
-      updatedAt: Number(card.updatedAt) || Number(card.createdAt) || now,
-    }));
+    .filter((card) => card?.id && !deletedIds.has(card.id) && !deletedColumnIds.has(String(card.columnId || "")))
+    .map((card, index) => {
+      const columnId = columnIds.has(card.columnId) ? card.columnId : fallbackColumnId;
+      return {
+        ...card,
+        columnId,
+        status: doneColumnIds.has(columnId) ? "done" : getSafeStatusId(card.status, card.focus),
+        order: Number.isFinite(card.order) ? card.order : index,
+        createdAt: Number(card.createdAt) || now,
+        updatedAt: Number(card.updatedAt) || Number(card.createdAt) || now,
+      };
+    });
   nextBoard.archivedCards = normalizeArchivedCards(nextBoard.archivedCards).filter((card) => !deletedIds.has(card.id));
   nextBoard.columns.forEach((column) => {
     nextBoard.cards
@@ -815,6 +835,11 @@ function normalizeBoard(board) {
 function markCardDeleted(cardId) {
   state.deletedCards = normalizeDeletedCards(state.deletedCards);
   state.deletedCards[cardId] = Date.now();
+}
+
+function markColumnDeleted(columnId) {
+  state.deletedColumns = normalizeDeletedColumns(state.deletedColumns);
+  state.deletedColumns[columnId] = Date.now();
 }
 
 function loadTheme() {
@@ -1111,6 +1136,11 @@ function getSafeStatusId(status, focus) {
   return focus ? "today" : "planned";
 }
 
+function isDoneColumn(column) {
+  const title = String(column?.title || "").toLowerCase();
+  return title.includes("готов") || title.includes("сделано");
+}
+
 function getSafeLabelId(labelId) {
   const value = String(labelId || "").trim();
   if (getLabelById(value)) {
@@ -1235,8 +1265,7 @@ function bindArchiveCompleteAction(actionEl, cardId, cardEl) {
 
 function shouldShowArchiveAction(card, status = getSafeStatusId(card?.status, card?.focus)) {
   const column = state.columns.find((item) => item.id === card?.columnId);
-  const title = String(column?.title || "").toLowerCase();
-  return status === "done" || title.includes("готов") || title.includes("сделано");
+  return status === "done" || isDoneColumn(column);
 }
 
 function getCardScheduleTime(card) {
@@ -2304,7 +2333,7 @@ function renderLabelOptions() {
 }
 
 function renderStats() {
-  const doneColumn = state.columns.find((column) => column.title.toLowerCase().includes("готов"));
+  const doneColumn = state.columns.find(isDoneColumn);
   totalCardsEl.textContent = state.cards.length;
   doneCardsEl.textContent = doneColumn
     ? state.cards.filter((card) => card.columnId === doneColumn.id).length
@@ -2913,10 +2942,12 @@ async function saveRemoteWorkspace() {
   isSavingRemoteWorkspace = true;
   try {
     const boardToSave = normalizeBoard(state);
+    const boardHasDeletedColumns = Object.keys(boardToSave.deletedColumns || {}).length > 0;
     const boardHasDeletedCards = Object.keys(boardToSave.deletedCards || {}).length > 0;
     if (
       !hasUserBoardContent(boardToSave) &&
       !normalizeArchivedCards(boardToSave.archivedCards).length &&
+      !boardHasDeletedColumns &&
       !boardHasDeletedCards
     ) {
       const { data: existingData, error: existingError } = await fetchRemoteWorkspace("board,updated_at");
@@ -3672,6 +3703,9 @@ async function saveCard(event) {
     reminderEnabled,
     updatedAt: changedAt,
   };
+  if (isDoneColumn(state.columns.find((column) => column.id === payload.columnId))) {
+    payload.status = "done";
+  }
 
   if (!payload.title) {
     return;
@@ -3693,6 +3727,7 @@ async function saveCard(event) {
       createdAt: changedAt,
     });
   }
+  state = normalizeBoard(state);
 
   quickColumnId = payload.columnId;
   const savePromise = persist({ immediate: true });
@@ -3747,8 +3782,10 @@ async function deleteActiveColumn() {
     state.cards = state.cards.filter((card) => card.columnId !== activeColumnId);
   }
 
+  markColumnDeleted(activeColumnId);
   state.columns = state.columns.filter((column) => column.id !== activeColumnId);
   quickColumnId = state.columns[0]?.id || "";
+  state = normalizeBoard(state);
   const savePromise = persist({ immediate: true });
   render();
   closeSheets();
@@ -3861,6 +3898,7 @@ async function saveVoiceCard(event) {
     createdAt,
     updatedAt: createdAt,
   });
+  state = normalizeBoard(state);
 
   quickColumnId = voiceColumnInput.value;
   const savePromise = persist({ immediate: true });
