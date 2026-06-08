@@ -196,10 +196,6 @@ body:not(.is-authenticated) .topbar {
   order: 2;
 }
 
-.archive-button strong {
-  display: none;
-}
-
 .archive-button:focus-visible {
   outline: 3px solid var(--accent-soft);
   outline-offset: 2px;
@@ -1582,18 +1578,6 @@ textarea {
 
   .archive-button {
     order: 1;
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    width: auto;
-    min-width: 96px;
-    padding: 0 14px;
-    gap: 8px;
-  }
-
-  .archive-button strong {
-    display: inline;
-    font-size: 14px;
-    font-weight: 900;
   }
 
   .brand {
