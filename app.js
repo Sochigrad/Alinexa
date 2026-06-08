@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-delete-sync-1";
+const APP_BUILD_ID = "20260608-column-drag-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -960,7 +960,7 @@ function renderBoardContent() {
       </div>
     `;
     header.addEventListener("pointerdown", (event) => {
-      if (event.target.closest("button:not(.column-color-handle)")) {
+      if (event.target.closest(".column-edit-btn")) {
         return;
       }
       startColumnDrag(event, safeColumn.id);
@@ -1001,7 +1001,10 @@ function renderBoardContent() {
 
     const colorHandle = header.querySelector(".column-color-handle");
     colorHandle?.addEventListener("pointerdown", (event) => startColumnDrag(event, safeColumn.id));
-    header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
+    header.querySelector(".column-name-button")?.addEventListener("click", () => {
+      if (Date.now() < suppressClickUntil) return;
+      openColumnSheet(safeColumn.id);
+    });
     header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
 
     boardEl.appendChild(section);
@@ -1050,7 +1053,7 @@ function renderBoardFallback() {
       </div>
     `;
     header.addEventListener("pointerdown", (event) => {
-      if (event.target.closest("button:not(.column-color-handle)")) {
+      if (event.target.closest(".column-edit-btn")) {
         return;
       }
       startColumnDrag(event, columnId);
@@ -1077,7 +1080,10 @@ function renderBoardFallback() {
       list.appendChild(empty);
     }
 
-    header.querySelector(".column-name-button")?.addEventListener("click", () => openColumnSheet(columnId));
+    header.querySelector(".column-name-button")?.addEventListener("click", () => {
+      if (Date.now() < suppressClickUntil) return;
+      openColumnSheet(columnId);
+    });
     header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(columnId));
     section.appendChild(list);
     const addCardButton = document.createElement("button");
@@ -1971,19 +1977,48 @@ function stopAutoScroll() {
 
 function startColumnDrag(event, columnId) {
   if (event.pointerType === "mouse" && event.button !== 0) return;
-  event.preventDefault();
   event.stopPropagation();
   clearTextSelection();
-  columnDrag = { columnId, pointerId: event.pointerId, clientX: event.clientX, hasMoved: false };
-  document.body.classList.add("is-column-dragging");
-  event.currentTarget.closest(".column")?.classList.add("is-column-dragging");
+  const columnEl = event.currentTarget.closest(".column");
+  const pointerType = event.pointerType || "mouse";
+  columnDrag = {
+    columnId,
+    pointerId: event.pointerId,
+    pointerType,
+    startX: event.clientX,
+    startY: event.clientY,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    hasMoved: false,
+    isActive: false,
+    columnEl,
+  };
   try { event.currentTarget.setPointerCapture(event.pointerId); } catch {}
 }
 
 function moveColumnDrag(event) {
   if (!columnDrag || event.pointerId !== columnDrag.pointerId) return;
-  event.preventDefault();
   columnDrag.clientX = event.clientX;
+  columnDrag.clientY = event.clientY;
+  const deltaX = event.clientX - columnDrag.startX;
+  const deltaY = event.clientY - columnDrag.startY;
+  const distance = Math.hypot(deltaX, deltaY);
+
+  if (!columnDrag.isActive) {
+    const threshold = columnDrag.pointerType === "mouse" ? 5 : 9;
+    if (distance < threshold) {
+      return;
+    }
+    if (Math.abs(deltaY) > Math.abs(deltaX) * 1.25) {
+      cleanupColumnDrag();
+      return;
+    }
+    columnDrag.isActive = true;
+    document.body.classList.add("is-column-dragging");
+    columnDrag.columnEl?.classList.add("is-column-dragging");
+  }
+
+  event.preventDefault();
   columnDrag.hasMoved = true;
   if (!columnDragFrame) columnDragFrame = requestAnimationFrame(updateColumnDrag);
 }
@@ -2040,7 +2075,10 @@ function animateColumnShift(previousRects) {
 
 function finishColumnDrag(event) {
   if (!columnDrag || event.pointerId !== columnDrag.pointerId) return;
-  event.preventDefault();
+  if (columnDrag.isActive) {
+    event.preventDefault();
+    suppressClickUntil = Date.now() + 350;
+  }
   const shouldSave = columnDrag.hasMoved;
   cleanupColumnDrag();
   if (shouldSave) persist({ immediate: true });
