@@ -72,6 +72,15 @@ body.is-card-dragging .column {
   scroll-snap-align: none;
 }
 
+body.is-column-dragging .board {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+}
+
+body.is-column-dragging .column {
+  scroll-snap-align: none;
+}
+
 button,
 input,
 textarea,
@@ -454,6 +463,7 @@ body:not(.is-authenticated) .topbar {
   padding: 12px;
   border-bottom: 1px solid var(--line);
   cursor: grab;
+  touch-action: none;
 }
 
 .column-header:active {
