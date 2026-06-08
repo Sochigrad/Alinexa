@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=20260608-mark-wordmark-1" />
+    <link rel="stylesheet" href="styles.css?v=20260608-trello-flow-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -20,6 +20,9 @@
             <p>мобильная доска</p>
           </div>
         </div>
+        <button class="archive-button" id="archiveButton" type="button" aria-label="Архив">
+          <span aria-hidden="true">↗</span>
+        </button>
         <div class="account-cluster">
           <span class="account-name" id="accountName" hidden></span>
           <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт">IN</button>
@@ -190,6 +193,15 @@
       <div class="search-results" id="searchResults"></div>
     </aside>
 
+    <aside class="sheet compact" id="archiveSheet" aria-hidden="true" aria-label="Архив">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2>Архив</h2>
+        <button class="ghost-button" id="closeArchiveButton" type="button">Закрыть</button>
+      </div>
+      <div class="archive-list" id="archiveList"></div>
+    </aside>
+
     <aside class="sheet compact" id="themeSheet" aria-hidden="true" aria-label="Настройка цветов">
       <form id="themeForm">
         <div class="sheet-handle"></div>
@@ -349,7 +361,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260608-mark-wordmark-1";
+      window.ALINEXA_BUILD_ID = "20260608-trello-flow-1";
       window.addEventListener("load", () => {
         if ("caches" in window) {
           caches
@@ -367,6 +379,6 @@
         }
       });
     </script>
-    <script src="app.js?v=20260608-column-select-1" defer></script>
+    <script src="app.js?v=20260608-trello-flow-1" defer></script>
   </body>
 </html>
