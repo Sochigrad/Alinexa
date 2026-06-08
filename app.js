@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-column-drag-1";
+const APP_BUILD_ID = "20260608-column-drag-2";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -2016,6 +2016,11 @@ function moveColumnDrag(event) {
     columnDrag.isActive = true;
     document.body.classList.add("is-column-dragging");
     columnDrag.columnEl?.classList.add("is-column-dragging");
+    if (columnDrag.columnEl) {
+      columnDrag.columnEl.style.zIndex = "5";
+      columnDrag.columnEl.style.willChange = "transform";
+      columnDrag.columnEl.style.transition = "none";
+    }
   }
 
   event.preventDefault();
@@ -2027,18 +2032,26 @@ function updateColumnDrag() {
   columnDragFrame = null;
   if (!columnDrag) return;
   autoScrollColumnsDuringColumnDrag(columnDrag.clientX);
-  const targetIndex = getColumnDropIndex(columnDrag.clientX);
+  updateDraggedColumnMotion();
+  const targetIndex = getColumnDropIndex(columnDrag.clientX, columnDrag.columnId);
   if (targetIndex !== -1) moveColumnToIndex(columnDrag.columnId, targetIndex);
 }
 
-function getColumnDropIndex(clientX) {
+function updateDraggedColumnMotion() {
+  if (!columnDrag?.columnEl) return;
+  const deltaX = columnDrag.clientX - columnDrag.startX;
+  columnDrag.columnEl.style.transform = `translate3d(${deltaX}px, 0, 0) scale(0.985)`;
+}
+
+function getColumnDropIndex(clientX, draggedColumnId) {
   const columns = [...boardEl.querySelectorAll(".column")];
   if (!columns.length) return -1;
-  for (let index = 0; index < columns.length; index += 1) {
-    const rect = columns[index].getBoundingClientRect();
+  const otherColumns = columns.filter((column) => column.dataset.columnId !== draggedColumnId);
+  for (let index = 0; index < otherColumns.length; index += 1) {
+    const rect = otherColumns[index].getBoundingClientRect();
     if (clientX < rect.left + rect.width / 2) return index;
   }
-  return columns.length - 1;
+  return otherColumns.length;
 }
 
 function moveColumnToIndex(columnId, targetIndex) {
@@ -2046,11 +2059,27 @@ function moveColumnToIndex(columnId, targetIndex) {
   if (currentIndex === -1) return;
   const boundedIndex = Math.max(0, Math.min(targetIndex, state.columns.length - 1));
   if (boundedIndex === currentIndex) return;
-  const previousRects = new Map([...boardEl.querySelectorAll(".column")].map((element) => [element.dataset.columnId, element.getBoundingClientRect()]));
+  const draggedColumn = columnDrag?.columnEl || boardEl.querySelector(`.column[data-column-id="${CSS.escape(columnId)}"]`);
+  if (!draggedColumn) return;
+  const previousRects = new Map(
+    [...boardEl.querySelectorAll(".column")]
+      .filter((element) => element !== draggedColumn)
+      .map((element) => [element.dataset.columnId, element.getBoundingClientRect()]),
+  );
+  const draggedRectBefore = draggedColumn.getBoundingClientRect();
   const [column] = state.columns.splice(currentIndex, 1);
   state.columns.splice(boundedIndex, 0, column);
-  render();
-  boardEl.querySelector('.column[data-column-id="' + cssEscape(columnId) + '"]')?.classList.add("is-column-dragging");
+  const nextColumnId = state.columns[boundedIndex + 1]?.id || "";
+  const nextColumn = nextColumnId
+    ? boardEl.querySelector(`.column[data-column-id="${CSS.escape(nextColumnId)}"]`)
+    : null;
+  const addColumnTile = boardEl.querySelector(".add-column-tile");
+  boardEl.insertBefore(draggedColumn, nextColumn || addColumnTile || null);
+  const draggedRectAfter = draggedColumn.getBoundingClientRect();
+  if (columnDrag) {
+    columnDrag.startX += draggedRectAfter.left - draggedRectBefore.left;
+  }
+  updateDraggedColumnMotion();
   animateColumnShift(previousRects);
 }
 
@@ -2095,6 +2124,12 @@ function cleanupColumnDrag() {
   }
   document.body.classList.remove("is-column-dragging");
   document.querySelectorAll(".column.is-column-dragging").forEach((element) => element.classList.remove("is-column-dragging"));
+  if (columnDrag?.columnEl) {
+    columnDrag.columnEl.style.removeProperty("transform");
+    columnDrag.columnEl.style.removeProperty("transition");
+    columnDrag.columnEl.style.removeProperty("z-index");
+    columnDrag.columnEl.style.removeProperty("will-change");
+  }
   columnDrag = null;
 }
 
