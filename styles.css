@@ -498,7 +498,7 @@ body:not(.is-authenticated) .topbar {
 
 .column.is-column-dragging {
   opacity: 0.78;
-  transform: scale(0.985);
+  box-shadow: 0 22px 54px rgba(15, 23, 42, 0.2);
 }
 
 body.is-column-dragging,
