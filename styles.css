@@ -123,6 +123,7 @@ body:not(.is-authenticated) .topbar {
   min-width: 0;
   align-items: center;
   gap: 9px;
+  order: 1;
 }
 
 .brand-mark {
@@ -150,7 +151,8 @@ body:not(.is-authenticated) .topbar {
 
 .brand h1 {
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  white-space: nowrap;
   color: #0b1726;
   font-size: 25px;
   font-weight: 950;
@@ -176,10 +178,11 @@ body:not(.is-authenticated) .topbar {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  order: 3;
 }
 
 .archive-button {
-  display: grid;
+  display: inline-grid;
   width: 44px;
   height: 44px;
   place-items: center;
@@ -190,6 +193,11 @@ body:not(.is-authenticated) .topbar {
   font-size: 18px;
   font-weight: 950;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  order: 2;
+}
+
+.archive-button strong {
+  display: none;
 }
 
 .archive-button:focus-visible {
@@ -709,6 +717,8 @@ body.is-column-dragging * {
   font-size: 15px;
   font-weight: 950;
   box-shadow: 0 8px 18px rgba(22, 163, 74, 0.18);
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .complete-action:hover,
@@ -1566,8 +1576,32 @@ textarea {
   }
 
   .topbar {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding-top: 24px;
+  }
+
+  .archive-button {
+    order: 1;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    width: auto;
+    min-width: 96px;
+    padding: 0 14px;
+    gap: 8px;
+  }
+
+  .archive-button strong {
+    display: inline;
+    font-size: 14px;
+    font-weight: 900;
+  }
+
+  .brand {
+    order: 2;
+  }
+
+  .account-cluster {
+    order: 3;
   }
 
   .brand {
