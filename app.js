@@ -4,7 +4,7 @@ const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260526-drag-solid-1";
+const APP_BUILD_ID = "20260605-column-picker-mobile-fix-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -1901,26 +1901,74 @@ function cssEscape(value) {
   return String(value).replace(/["\\]/g, "\\$&");
 }
 
+function getSafeColumns() {
+  return Array.isArray(state?.columns) && state.columns.length ? state.columns : defaultBoard.columns;
+}
+
+function getSafeColumnValue(...preferredIds) {
+  const columns = getSafeColumns();
+  const ids = new Set(columns.map((column, index) => String(column?.id || `column-${index}`)));
+  const preferred = preferredIds
+    .map((id) => String(id || "").trim())
+    .find((id) => id && ids.has(id));
+  return preferred || String(columns[0]?.id || "");
+}
+
+function getSafeLabels() {
+  return Array.isArray(labels) && labels.length ? labels : defaultLabels;
+}
+
+function getSafeLabelValue(...preferredIds) {
+  const safeLabels = getSafeLabels();
+  const ids = new Set(safeLabels.map((label) => String(label?.id || "")));
+  const preferred = preferredIds
+    .map((id) => String(id || "").trim())
+    .find((id) => id && ids.has(id));
+  return preferred || String(safeLabels[0]?.id || "product");
+}
+
 function renderColumnOptions() {
-  const options = state.columns
-    .map((column) => `<option value="${column.id}">${escapeHtml(column.title)}</option>`)
+  const columns = getSafeColumns();
+  const currentCardColumn = cardColumnInput?.value || quickColumnId;
+  const currentVoiceColumn = voiceColumnInput?.value || quickColumnId;
+  const options = columns
+    .map((column, index) => {
+      const id = String(column?.id || `column-${index}`);
+      const title = String(column?.title || `Column ${index + 1}`);
+      return `<option value="${escapeHtml(id)}">${escapeHtml(title)}</option>`;
+    })
     .join("");
-  cardColumnInput.innerHTML = options;
-  voiceColumnInput.innerHTML = options;
+
+  if (cardColumnInput) {
+    cardColumnInput.innerHTML = options;
+    cardColumnInput.value = getSafeColumnValue(currentCardColumn, quickColumnId);
+  }
+  if (voiceColumnInput) {
+    voiceColumnInput.innerHTML = options;
+    voiceColumnInput.value = getSafeColumnValue(currentVoiceColumn, quickColumnId);
+  }
 }
 
 function renderLabelOptions() {
-  const fallbackLabel = labels[0]?.id || "product";
-  const currentCardLabel = cardLabelInput.value || fallbackLabel;
-  const currentVoiceLabel = voiceLabelInput.value || fallbackLabel;
-  const options = labels
-    .map((label) => `<option value="${label.id}">${escapeHtml(label.name)}</option>`)
+  const safeLabels = getSafeLabels();
+  const currentCardLabel = cardLabelInput?.value || safeLabels[0]?.id || "product";
+  const currentVoiceLabel = voiceLabelInput?.value || safeLabels[0]?.id || "product";
+  const options = safeLabels
+    .map((label) => {
+      const id = String(label?.id || "");
+      const name = String(label?.name || id || "Label");
+      return `<option value="${escapeHtml(id)}">${escapeHtml(name)}</option>`;
+    })
     .join("");
 
-  cardLabelInput.innerHTML = options;
-  voiceLabelInput.innerHTML = options;
-  cardLabelInput.value = getLabelById(currentCardLabel) ? currentCardLabel : fallbackLabel;
-  voiceLabelInput.value = getLabelById(currentVoiceLabel) ? currentVoiceLabel : fallbackLabel;
+  if (cardLabelInput) {
+    cardLabelInput.innerHTML = options;
+    cardLabelInput.value = getSafeLabelValue(currentCardLabel);
+  }
+  if (voiceLabelInput) {
+    voiceLabelInput.innerHTML = options;
+    voiceLabelInput.value = getSafeLabelValue(currentVoiceLabel);
+  }
 }
 
 function renderStats() {
@@ -3082,6 +3130,8 @@ function translateAuthError(message) {
 function openCardSheet(cardId = null, columnId = quickColumnId) {
   activeCardId = cardId;
   const card = state.cards.find((item) => item.id === cardId);
+  renderColumnOptions();
+  renderLabelOptions();
 
   sheetTitle.textContent = card ? "Редактировать карточку" : "Новая карточка";
   sheetTitle.innerHTML = card
@@ -3092,8 +3142,8 @@ function openCardSheet(cardId = null, columnId = quickColumnId) {
     : '<span class="sheet-title-main">&#1053;&#1086;&#1074;&#1072;&#1103;</span><span class="sheet-title-sub">&#1082;&#1072;&#1088;&#1090;&#1086;&#1095;&#1082;&#1072;</span>';
   cardTitleInput.value = card?.title || "";
   cardDescriptionInput.value = card?.description || "";
-  cardColumnInput.value = card?.columnId || columnId || state.columns[0]?.id;
-  cardLabelInput.value = card?.label || labels[0]?.id || "product";
+  cardColumnInput.value = getSafeColumnValue(card?.columnId, columnId, quickColumnId);
+  cardLabelInput.value = getSafeLabelValue(card?.label);
   cardFocusInput.checked = Boolean(card?.focus);
   cardStatusInput.value = card?.status || (card?.focus ? "today" : "planned");
   cardDateInput.value = card?.plannedDate || "";
@@ -3143,8 +3193,9 @@ function openLabelsSheet() {
 
 function openVoiceSheet() {
   renderColumnOptions();
-  voiceColumnInput.value = quickColumnId || state.columns[0]?.id;
-  voiceLabelInput.value = labels[0]?.id || "product";
+  renderLabelOptions();
+  voiceColumnInput.value = getSafeColumnValue(quickColumnId);
+  voiceLabelInput.value = getSafeLabelValue();
   voiceFocusInput.checked = true;
   voiceStatusInput.value = "today";
   setVoiceState("Готов к диктовке", "Нажмите кнопку и говорите. Текст попадет в карточку.");
