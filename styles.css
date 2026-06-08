@@ -122,40 +122,39 @@ body:not(.is-authenticated) .topbar {
   display: flex;
   min-width: 0;
   align-items: center;
+  gap: 9px;
 }
 
-.brand-logo {
+.brand-mark {
   display: block;
-  width: min(48vw, 212px);
-  max-height: 56px;
+  width: clamp(42px, 10vw, 58px);
+  height: clamp(42px, 10vw, 58px);
   object-fit: contain;
-  object-position: left center;
+  filter: drop-shadow(0 10px 20px rgba(15, 118, 110, 0.16));
 }
 
-.brand p,
-.brand h1 {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+.brand-text {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
 }
 
 .brand p {
   color: var(--accent);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
-  text-transform: uppercase;
+  line-height: 1.05;
+  text-transform: lowercase;
 }
 
 .brand h1 {
   max-width: 100%;
   overflow-wrap: anywhere;
-  font-size: 26px;
+  color: #0b1726;
+  font-size: 25px;
   font-weight: 950;
-  line-height: 1.15;
+  line-height: 0.98;
 }
 
 .account-name {
@@ -230,37 +229,46 @@ body:not(.is-authenticated) .topbar {
 }
 
 .welcome-kicker {
-  display: grid;
-  justify-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(13px, 4vw, 28px);
   margin: 0;
   max-width: min(100%, 780px);
   color: #0b1726;
   letter-spacing: 0;
+  text-align: left;
 }
 
-.welcome-logo {
+.welcome-mark {
   display: block;
-  width: min(88vw, 720px);
-  max-height: clamp(132px, 28vw, 260px);
+  width: clamp(92px, 28vw, 170px);
+  height: clamp(92px, 28vw, 170px);
   object-fit: contain;
   filter: drop-shadow(0 18px 34px rgba(15, 23, 42, 0.08));
 }
 
+.welcome-wordmark {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
 .welcome-kicker-small {
-  display: none;
+  display: block;
   color: var(--accent);
-  font-size: clamp(18px, 5.2vw, 30px);
+  font-size: clamp(16px, 4.2vw, 30px);
   font-weight: 900;
   line-height: 1;
-  text-transform: uppercase;
+  text-transform: lowercase;
 }
 
 .welcome-kicker-brand {
-  display: none;
+  display: block;
   color: #0b1726;
-  font-size: clamp(48px, 15vw, 86px);
+  font-size: clamp(46px, 14vw, 92px);
   font-weight: 950;
-  line-height: 0.92;
+  line-height: 0.9;
 }
 
 .welcome-copy h2 {
@@ -1379,11 +1387,12 @@ textarea {
   .brand {
     display: flex;
     align-items: center;
+    gap: 10px;
   }
 
-  .brand-logo {
-    width: 236px;
-    max-height: 62px;
+  .brand-mark {
+    width: 62px;
+    height: 62px;
   }
 
   .brand p {
@@ -1407,12 +1416,14 @@ textarea {
   }
 
   .welcome-kicker {
+    display: flex;
     max-width: min(100%, 820px);
+    gap: 28px;
   }
 
-  .welcome-logo {
-    width: min(72vw, 760px);
-    max-height: 270px;
+  .welcome-mark {
+    width: 176px;
+    height: 176px;
   }
 
   .welcome-kicker-small {
@@ -1537,6 +1548,33 @@ textarea {
 
   .topbar {
     padding: 14px 14px 8px;
+  }
+
+  .brand {
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 48px;
+    height: 48px;
+  }
+
+  .brand h1 {
+    font-size: 24px;
+  }
+
+  .brand p {
+    font-size: 11px;
+  }
+
+  .welcome-kicker {
+    gap: 14px;
+    justify-content: center;
+  }
+
+  .welcome-mark {
+    width: clamp(88px, 27vw, 124px);
+    height: clamp(88px, 27vw, 124px);
   }
 
   .board {
