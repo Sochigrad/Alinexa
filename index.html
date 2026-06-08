@@ -8,15 +8,17 @@
     <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=20260608-logo-1" />
+    <link rel="stylesheet" href="styles.css?v=20260608-mark-wordmark-1" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <img class="brand-logo" src="assets/alinexa-logo.png" alt="Alinexa" />
-          <p>Мобильная доска</p>
-          <h1 id="boardTitle">Alinexa</h1>
+          <img class="brand-mark" src="assets/alinexa-mark.png" alt="" aria-hidden="true" />
+          <div class="brand-text">
+            <h1 id="boardTitle">Alinexa</h1>
+            <p>мобильная доска</p>
+          </div>
         </div>
         <div class="account-cluster">
           <span class="account-name" id="accountName" hidden></span>
@@ -27,9 +29,11 @@
       <section class="welcome-screen" id="welcomeScreen" aria-label="Старт Alinexa">
         <div class="welcome-copy">
           <p class="welcome-kicker">
-            <img class="welcome-logo" src="assets/alinexa-logo.png" alt="Alinexa - мобильная доска" />
-            <span class="welcome-kicker-small">Мобильная доска</span>
-            <span class="welcome-kicker-brand">Alinexa</span>
+            <img class="welcome-mark" src="assets/alinexa-mark.png" alt="" aria-hidden="true" />
+            <span class="welcome-wordmark">
+              <span class="welcome-kicker-brand">Alinexa</span>
+              <span class="welcome-kicker-small">мобильная доска</span>
+            </span>
           </p>
           <h2><span>Задачи, идеи и&nbsp;дела —</span><span>в&nbsp;одном аккуратном месте</span></h2>
           <p>
@@ -345,7 +349,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260608-column-select-1";
+      window.ALINEXA_BUILD_ID = "20260608-mark-wordmark-1";
       window.addEventListener("load", () => {
         if ("caches" in window) {
           caches
