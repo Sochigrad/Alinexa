@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #eef2f7;
   --ink: #111827;
   --muted: #667085;
@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260609-welcome-bg-1"),
+    url("assets/welcome-background.png?v=20260609-mobile-auth-sync-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -196,6 +196,20 @@ body:not(.is-authenticated) .topbar {
   gap: 8px;
   order: 3;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.account-tap-target {
+  position: absolute;
+  z-index: 32;
+  inset: -10px;
+  display: block;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
   pointer-events: auto;
   touch-action: manipulation;
 }
