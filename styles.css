@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260609-avatar-cabinet-1"),
+    url("assets/welcome-background.png?v=20260609-auth-sheet-force-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -1115,6 +1115,20 @@ body.is-column-dragging * {
 #authSheet.is-open,
 #authSheet[aria-hidden="false"] {
   z-index: 70;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+html.auth-force-open #scrim,
+body.auth-force-open #scrim {
+  z-index: 2147483500;
+}
+
+html.auth-force-open #authSheet,
+body.auth-force-open #authSheet {
+  z-index: 2147483600 !important;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
