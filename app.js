@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-cross-browser-sync-1";
+const APP_BUILD_ID = "20260609-mobile-fallback-demo-clean-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -112,52 +112,19 @@ const defaultBoard = {
     { id: "review", title: "Проверка" },
     { id: "done", title: "Готово" },
   ],
-  cards: [
-    {
-      id: "card-1",
-      columnId: "backlog",
-      title: "Собрать идеи для релиза",
-      description: "Коротко описать самые ценные фичи и убрать лишнее.",
-      label: "product",
-      focus: true,
-      order: 0,
-      createdAt: Date.now() - 4000,
-    },
-    {
-      id: "card-2",
-      columnId: "doing",
-      title: "Прототип мобильного экрана",
-      description: "Проверить навигацию, нижнюю панель и лист редактирования.",
-      label: "design",
-      focus: true,
-      order: 0,
-      createdAt: Date.now() - 3000,
-    },
-    {
-      id: "card-3",
-      columnId: "review",
-      title: "Проверить сохранение",
-      description: "Карточки должны оставаться после перезагрузки страницы.",
-      label: "dev",
-      focus: false,
-      order: 0,
-      createdAt: Date.now() - 2000,
-    },
-    {
-      id: "card-4",
-      columnId: "done",
-      title: "Создать первую доску",
-      description: "Стартовый шаблон готов к изменению под команду.",
-      label: "ops",
-      focus: false,
-      order: 0,
-      createdAt: Date.now() - 1000,
-    },
-  ],
+  cards: [],
   deletedColumns: {},
   deletedCards: {},
   archivedCards: [],
 };
+
+const LEGACY_DEMO_CARD_IDS = new Set(["card-1", "card-2", "card-3", "card-4"]);
+const LEGACY_DEMO_CARD_TITLES = new Set([
+  "Собрать идеи для релиза",
+  "Прототип мобильного экрана",
+  "Проверить сохранение",
+  "Создать первую доску",
+]);
 
 function createPrivateEmptyBoard() {
   return normalizeBoard({
@@ -371,12 +338,26 @@ function bindAccountButton() {
   document.addEventListener("click", openAccount, { capture: true });
 }
 
+window.alinexaOpenAuth = (event) => {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  openAuthSheet();
+  return false;
+};
+
+window.alinexaOpenRegistration = (event) => {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  openRegistrationSheet();
+  return false;
+};
+
 let lastCriticalActionAt = 0;
 let lastCriticalActionId = "";
 
 function runCriticalAction(event) {
   const target = event.target?.closest?.(
-    "#welcomeSignUpButton,#welcomeSignInButton,#signInButton,#signUpButton,#resetPasswordButton,#signOutButton,#closeAuthButton",
+    "#welcomeSignUpButton,#welcomeSignInButton,#signInButton,#resetPasswordButton,#signOutButton,#closeAuthButton",
   );
   if (!target || target.disabled) {
     return;
@@ -399,7 +380,6 @@ function runCriticalAction(event) {
   const actions = {
     welcomeSignUpButton: openRegistrationSheet,
     welcomeSignInButton: openAuthSheet,
-    signUpButton: toggleAuthMode,
     accountButton: openAuthSheet,
     signInButton: handleAuthSubmit,
     resetPasswordButton: sendPasswordResetEmail,
@@ -834,6 +814,14 @@ function normalizeBoard(board) {
   };
   const deletedColumnIds = new Set(Object.keys(nextBoard.deletedColumns));
   const usedColumnColors = new Set();
+  nextBoard.cards = nextBoard.cards.filter((card) => {
+    const isLegacyDemoCard = LEGACY_DEMO_CARD_IDS.has(String(card?.id || "")) && LEGACY_DEMO_CARD_TITLES.has(String(card?.title || ""));
+    if (isLegacyDemoCard) {
+      nextBoard.deletedCards[String(card.id)] = Number(nextBoard.deletedCards[String(card.id)]) || now;
+      return false;
+    }
+    return true;
+  });
   nextBoard.columns = nextBoard.columns
     .filter((column) => column?.id && column?.title && !deletedColumnIds.has(String(column.id)))
     .map((column, index) => {
@@ -3488,6 +3476,8 @@ async function signOut(event) {
     isSigningOut = false;
   }
 }
+
+window.alinexaSignOut = signOut;
 
 function clearAuthStorageOnThisDevice() {
   try {
