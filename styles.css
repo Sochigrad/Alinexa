@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260609-auth-sheet-force-1"),
+    url("assets/welcome-background.png?v=20260609-mobile-card-sheet-layout-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -1064,7 +1064,7 @@ body.is-column-dragging * {
 .scrim {
   position: fixed;
   inset: 0;
-  z-index: 19;
+  z-index: 50;
   background: rgba(15, 23, 42, 0.44);
 }
 
@@ -1073,7 +1073,7 @@ body.is-column-dragging * {
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 20;
+  z-index: 60;
   max-height: 92vh;
   max-height: min(92svh, calc(var(--visual-viewport-height, 100vh) - 12px));
   overflow-y: auto;
@@ -1980,15 +1980,15 @@ textarea {
   .sheet,
   .sheet.compact,
   #authSheet.compact {
-    top: var(--sheet-mobile-top);
+    top: max(12px, var(--sheet-mobile-top));
     right: 0;
     bottom: auto;
     left: 0;
     width: auto;
-    height: calc(var(--visual-viewport-height, 100vh) - var(--sheet-mobile-top));
-    max-height: calc(var(--visual-viewport-height, 100vh) - var(--sheet-mobile-top));
+    height: calc(var(--visual-viewport-height, 100vh) - max(12px, var(--sheet-mobile-top)));
+    max-height: calc(var(--visual-viewport-height, 100vh) - max(12px, var(--sheet-mobile-top)));
     border-radius: 20px 20px 0 0;
-    padding: 8px 14px calc(16px + var(--safe-bottom));
+    padding: 10px 14px calc(16px + var(--safe-bottom));
     opacity: 1;
     pointer-events: auto;
     transform: translateY(106%);
@@ -2070,14 +2070,15 @@ textarea {
   }
 
   .sheet-head {
-    align-items: flex-start;
-    margin-bottom: 12px;
+    align-items: center;
+    min-height: 46px;
+    margin-bottom: 16px;
   }
 
   .sheet-head h2 {
-    max-width: calc(100vw - 120px);
-    font-size: 18px;
-    line-height: 1.15;
+    max-width: calc(100vw - 142px);
+    font-size: 20px;
+    line-height: 1.08;
     overflow-wrap: normal;
     word-break: keep-all;
   }
@@ -2088,10 +2089,11 @@ textarea {
   }
 
   .sheet-head .ghost-button {
-    min-width: 62px;
-    min-height: 34px;
-    padding: 0 10px;
-    font-size: 12px;
+    min-width: 88px;
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+    flex: 0 0 auto;
   }
 
   .field-grid,
