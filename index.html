@@ -7,13 +7,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
-    <link rel="shortcut icon" href="/favicon.ico?v=20260609-mobile-cabinet-sync-2" type="image/x-icon" />
-    <link rel="icon" href="/favicon.ico?v=20260609-mobile-cabinet-sync-2" sizes="any" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260609-mobile-cabinet-sync-2" />
-    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260609-mobile-cabinet-sync-2" />
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260609-mobile-cabinet-sync-2" />
-    <link rel="manifest" href="manifest.webmanifest?v=20260609-mobile-cabinet-sync-2" />
-    <link rel="stylesheet" href="styles.css?v=20260609-mobile-cabinet-sync-2" />
+    <link rel="shortcut icon" href="/favicon.ico?v=20260609-avatar-cabinet-1" type="image/x-icon" />
+    <link rel="icon" href="/favicon.ico?v=20260609-avatar-cabinet-1" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260609-avatar-cabinet-1" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260609-avatar-cabinet-1" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260609-avatar-cabinet-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260609-avatar-cabinet-1" />
+    <link rel="stylesheet" href="styles.css?v=20260609-avatar-cabinet-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -338,6 +338,14 @@
           <button class="ghost-button" id="closeAuthButton" type="button">Закрыть</button>
         </div>
         <div class="auth-status" id="authStatus">Войдите или зарегистрируйтесь через e-mail.</div>
+        <div class="avatar-editor" id="avatarEditor" hidden>
+          <div class="avatar-preview" id="avatarPreview" aria-hidden="true">AM</div>
+          <div class="avatar-editor-controls">
+            <label class="avatar-upload-button" for="avatarInput">Загрузить фото</label>
+            <input id="avatarInput" type="file" accept="image/*" />
+            <button class="ghost-button" id="removeAvatarButton" type="button">Убрать фото</button>
+          </div>
+        </div>
         <label id="authEmailLabel">
           <span>E-mail</span>
           <input id="authEmailInput" type="email" autocomplete="email" required />
@@ -371,7 +379,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260609-mobile-cabinet-sync-2";
+      window.ALINEXA_BUILD_ID = "20260609-avatar-cabinet-1";
       window.alinexaFallbackOpenSheet = (mode, event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
@@ -418,7 +426,7 @@
             .forEach((key) => localStorage.removeItem(key));
           sessionStorage.clear();
         } catch {}
-        window.location.href = "/?signed_out=1&v=20260609-mobile-cabinet-sync-2";
+        window.location.href = "/?signed_out=1&v=20260609-avatar-cabinet-1";
         return false;
       };
       window.addEventListener("load", () => {
@@ -438,7 +446,7 @@
         }
       });
     </script>
-    <script src="app.js?v=20260609-mobile-cabinet-sync-2" defer></script>
+    <script src="app.js?v=20260609-avatar-cabinet-1" defer></script>
   </body>
 </html>
 
