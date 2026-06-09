@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-fallback-demo-clean-1";
+const APP_BUILD_ID = "20260609-mobile-cabinet-sync-2";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -260,6 +260,7 @@ const resetPasswordButton = document.querySelector("#resetPasswordButton");
 const accountButton = document.querySelector("#accountButton");
 const accountName = document.querySelector("#accountName");
 const accountTapTarget = document.querySelector("#accountTapTarget");
+const mobileAccountButton = document.querySelector("#mobileAccountButton");
 const welcomeSignUpButton = document.querySelector("#welcomeSignUpButton");
 const welcomeSignInButton = document.querySelector("#welcomeSignInButton");
 let authMode = "sign-in";
@@ -304,12 +305,14 @@ function bindReliableTap(button, handler) {
 
 function bindAccountButton() {
   const accountCluster = document.querySelector(".account-cluster");
-  if (!accountButton && !accountCluster && !accountTapTarget) {
+  if (!accountButton && !accountCluster && !accountTapTarget && !mobileAccountButton) {
     return;
   }
   let lastRunAt = 0;
   const openAccount = (event) => {
-    const target = event?.target?.closest?.("#accountButton,#accountName,#accountTapTarget,.account-cluster");
+    const target = event?.target?.closest?.(
+      "#accountButton,#accountName,#accountTapTarget,.account-cluster,#mobileAccountButton",
+    );
     if (event && !target) {
       return;
     }
@@ -327,7 +330,7 @@ function bindAccountButton() {
     openAuthSheet();
   };
   window.openAlinexaAccount = openAccount;
-  [accountButton, accountName, accountTapTarget, accountCluster].filter(Boolean).forEach((target) => {
+  [accountButton, accountName, accountTapTarget, accountCluster, mobileAccountButton].filter(Boolean).forEach((target) => {
     target.addEventListener("pointerdown", openAccount, { passive: false });
     target.addEventListener("touchstart", openAccount, { passive: false });
     target.addEventListener("touchend", openAccount, { passive: false });
@@ -357,7 +360,7 @@ let lastCriticalActionId = "";
 
 function runCriticalAction(event) {
   const target = event.target?.closest?.(
-    "#welcomeSignUpButton,#welcomeSignInButton,#signInButton,#resetPasswordButton,#signOutButton,#closeAuthButton",
+    "#welcomeSignUpButton,#welcomeSignInButton,#mobileAccountButton,#signInButton,#resetPasswordButton,#signOutButton,#closeAuthButton",
   );
   if (!target || target.disabled) {
     return;
@@ -380,6 +383,7 @@ function runCriticalAction(event) {
   const actions = {
     welcomeSignUpButton: openRegistrationSheet,
     welcomeSignInButton: openAuthSheet,
+    mobileAccountButton: openAuthSheet,
     accountButton: openAuthSheet,
     signInButton: handleAuthSubmit,
     resetPasswordButton: sendPasswordResetEmail,
