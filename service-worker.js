@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260609-mobile-cabinet-sync-2";
+self.__ALINEXA_SW_VERSION__ = "20260609-avatar-cabinet-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
