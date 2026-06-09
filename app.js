@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-direct-login-1";
+const APP_BUILD_ID = "20260609-mobile-cloud-session-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -3001,8 +3001,12 @@ function getUserInitials(user) {
   return (meta.login || user?.email || "IN").slice(0, 2).toUpperCase();
 }
 
+function hasCloudAuthSession() {
+  return Boolean(currentUser && (currentSession?.access_token || supabaseClient));
+}
+
 async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
-  if (!supabaseClient || !currentUser) {
+  if (!hasCloudAuthSession()) {
     return;
   }
 
@@ -3089,7 +3093,7 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
 }
 
 async function syncRemoteWorkspace() {
-  if (!supabaseClient || !currentUser) {
+  if (!hasCloudAuthSession()) {
     return;
   }
 
@@ -3120,7 +3124,7 @@ function stopRemoteSync() {
 }
 
 function queueRemoteWorkspaceSave() {
-  if (isApplyingRemoteWorkspace || !supabaseClient || !currentUser) {
+  if (isApplyingRemoteWorkspace || !hasCloudAuthSession()) {
     return;
   }
   clearTimeout(remoteSaveTimer);
@@ -3130,6 +3134,9 @@ function queueRemoteWorkspaceSave() {
 async function getAccessToken() {
   if (currentSession?.access_token) {
     return currentSession.access_token;
+  }
+  if (!supabaseClient?.auth?.getSession) {
+    return "";
   }
   const { data } = await supabaseClient.auth.getSession();
   currentSession = data.session || null;
@@ -3196,7 +3203,7 @@ async function upsertRemoteWorkspace(payload) {
 }
 
 async function saveRemoteWorkspace() {
-  if (!supabaseClient || !currentUser) {
+  if (!hasCloudAuthSession()) {
     return;
   }
 
