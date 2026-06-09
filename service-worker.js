@@ -1,4 +1,4 @@
-﻿self.__ALINEXA_SW_VERSION__ = "20260609-welcome-bg-1";
+﻿self.__ALINEXA_SW_VERSION__ = "20260609-mobile-auth-sync-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
