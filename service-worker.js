@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260609-auth-timeout-column-clean-1";
+self.__ALINEXA_SW_VERSION__ = "20260609-mobile-direct-login-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
