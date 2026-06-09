@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-auth-visible-1";
+const APP_BUILD_ID = "20260609-auth-timeout-column-clean-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -867,6 +867,7 @@ function normalizeBoard(board) {
       };
     });
   nextBoard.archivedCards = normalizeArchivedCards(nextBoard.archivedCards).filter((card) => !deletedIds.has(card.id));
+  pruneEmptyDuplicateColumns(nextBoard, now);
   nextBoard.columns.forEach((column) => {
     nextBoard.cards
       .filter((card) => card.columnId === column.id)
@@ -876,6 +877,51 @@ function normalizeBoard(board) {
       });
   });
   return nextBoard;
+}
+
+function pruneEmptyDuplicateColumns(board, deletedAt = Date.now()) {
+  const cardCounts = new Map();
+  board.cards.forEach((card) => {
+    cardCounts.set(card.columnId, (cardCounts.get(card.columnId) || 0) + 1);
+  });
+  const titleGroups = new Map();
+  board.columns.forEach((column) => {
+    const key = normalizeColumnTitleKey(column.title);
+    if (!key) {
+      return;
+    }
+    if (!titleGroups.has(key)) {
+      titleGroups.set(key, []);
+    }
+    titleGroups.get(key).push(column);
+  });
+
+  const removeIds = new Set();
+  titleGroups.forEach((columns) => {
+    if (columns.length < 2) {
+      return;
+    }
+    const nonEmptyColumns = columns.filter((column) => (cardCounts.get(column.id) || 0) > 0);
+    const keepColumn = nonEmptyColumns[0] || columns[0];
+    columns.forEach((column) => {
+      const isEmptyDuplicate = column.id !== keepColumn.id && (cardCounts.get(column.id) || 0) === 0;
+      if (isEmptyDuplicate) {
+        removeIds.add(column.id);
+        board.deletedColumns[column.id] = Number(board.deletedColumns[column.id]) || deletedAt;
+      }
+    });
+  });
+
+  if (removeIds.size) {
+    board.columns = board.columns.filter((column) => !removeIds.has(column.id));
+  }
+}
+
+function normalizeColumnTitleKey(title) {
+  return String(title || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 function markCardDeleted(cardId) {
@@ -3352,7 +3398,7 @@ async function signInWithEmail(event) {
   }
 
   setAuthBusy(true);
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  const { data, error } = await signInWithPasswordResilient(email, password);
   setAuthBusy(false);
   if (error) {
     setAuthStatus(`Войти не получилось: ${translateAuthError(error.message)}`, "error");
@@ -3370,6 +3416,85 @@ async function signInWithEmail(event) {
   authPasswordRepeatInput.value = "";
   setAuthStatus("Вход выполнен.", "success");
   closeSheets();
+}
+
+async function signInWithPasswordResilient(email, password) {
+  const primaryResult = await withTimeout(
+    supabaseClient.auth.signInWithPassword({ email, password }).catch((error) => ({ error })),
+    7000,
+    { timedOut: true },
+  );
+  if (!primaryResult?.timedOut) {
+    return primaryResult;
+  }
+
+  setAuthStatus("Обычный вход завис. Пробую запасной вход...", "");
+  return signInWithPasswordDirect(email, password);
+}
+
+async function signInWithPasswordDirect(email, password) {
+  try {
+    const response = await withTimeout(
+      fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      }),
+      8000,
+      null,
+    );
+    if (!response) {
+      return { data: null, error: new Error("запрос входа не ответил. Обновите страницу и попробуйте еще раз.") };
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return {
+        data: null,
+        error: new Error(data.msg || data.message || data.error_description || data.error || `HTTP ${response.status}`),
+      };
+    }
+    const session = data?.access_token
+      ? {
+          ...data,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_at: Math.floor(Date.now() / 1000) + Number(data.expires_in || 3600),
+          user: data.user || null,
+        }
+      : null;
+    if (!session?.access_token) {
+      return { data: null, error: new Error("Supabase не вернул сессию.") };
+    }
+    storeDirectAuthSession(session);
+    await withTimeout(
+      supabaseClient.auth
+        .setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        })
+        .catch(() => null),
+      1800,
+      null,
+    );
+    return { data: { session, user: session.user || data.user || null }, error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
+function storeDirectAuthSession(session) {
+  if (!session?.access_token) {
+    return;
+  }
+  try {
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // Auth still works for the current page through currentSession.
+  }
 }
 
 async function signUpWithEmail(event) {
