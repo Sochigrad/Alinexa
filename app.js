@@ -1,12 +1,13 @@
-﻿const STORAGE_KEY = "taskflow-board-v1";
+const STORAGE_KEY = "taskflow-board-v1";
 const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
 const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
+const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-cabinet-sync-2";
+const APP_BUILD_ID = "20260609-avatar-cabinet-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -253,6 +254,10 @@ const authPasswordText = document.querySelector("#authPasswordText");
 const authPasswordInput = document.querySelector("#authPasswordInput");
 const authPasswordRepeatLabel = document.querySelector("#authPasswordRepeatLabel");
 const authPasswordRepeatInput = document.querySelector("#authPasswordRepeatInput");
+const avatarEditor = document.querySelector("#avatarEditor");
+const avatarPreview = document.querySelector("#avatarPreview");
+const avatarInput = document.querySelector("#avatarInput");
+const removeAvatarButton = document.querySelector("#removeAvatarButton");
 const signOutButton = document.querySelector("#signOutButton");
 const signInButton = document.querySelector("#signInButton");
 const signUpButton = document.querySelector("#signUpButton");
@@ -419,12 +424,15 @@ document.querySelector("#closeVoiceButton").addEventListener("click", closeSheet
 document.querySelector("#closeLabelsButton").addEventListener("click", closeSheets);
 document.querySelector("#closeAuthButton").addEventListener("click", closeSheets);
 bindAccountButton();
+bindReliableTap(mobileAccountButton, openAuthSheet);
 bindReliableTap(welcomeSignUpButton, openRegistrationSheet);
 bindReliableTap(welcomeSignInButton, openAuthSheet);
 bindReliableTap(document.querySelector("#signInButton"), handleAuthSubmit);
 bindReliableTap(document.querySelector("#resetPasswordButton"), sendPasswordResetEmail);
 bindReliableTap(document.querySelector("#signOutButton"), signOut);
 bindReliableTap(document.querySelector("#closeAuthButton"), closeSheets);
+avatarInput?.addEventListener("change", saveAvatarFromInput);
+removeAvatarButton?.addEventListener("click", removeAvatar);
 scrimEl.addEventListener("click", closeSheets);
 document.addEventListener("pointermove", moveTouchDrag, { passive: false });
 document.addEventListener("pointerup", finishTouchDrag, { passive: false });
@@ -2765,12 +2773,12 @@ function createSupabaseRestClient() {
 function updateAuthUi(user) {
   const displayName = getUserDisplayName(user);
   document.body.classList.toggle("is-authenticated", Boolean(user));
-  accountButton.textContent = user ? getUserInitials(user) : "IN";
   accountButton.setAttribute("aria-label", user ? `Кабинет ${displayName}` : "Войти в аккаунт");
   if (accountName) {
     accountName.hidden = !user;
     accountName.textContent = user ? displayName : "";
   }
+  applyAvatarUi(user);
   signOutButton.hidden = !user || authMode === "sign-up" || authMode === "password-reset";
   if (user) {
     authEmailInput.value = user.email || "";
@@ -2778,6 +2786,157 @@ function updateAuthUi(user) {
       setAuthStatus(`Кабинет: ${displayName}. E-mail: ${user.email}.`, "success");
     }
   }
+}
+
+function loadProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}") || {};
+  } catch {
+    localStorage.removeItem(PROFILE_KEY);
+    return {};
+  }
+}
+
+function saveProfile(profile) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile || {}));
+}
+
+function getStoredAvatarForUser(user) {
+  if (!user?.id) {
+    return "";
+  }
+  const localProfile = loadProfile();
+  if (localProfile.userId === user.id && localProfile.avatarDataUrl) {
+    return localProfile.avatarDataUrl;
+  }
+  return user.user_metadata?.avatar_url || user.user_metadata?.avatarDataUrl || "";
+}
+
+function applyAvatarUi(user) {
+  const initials = user ? getUserInitials(user) : "IN";
+  const avatarUrl = getStoredAvatarForUser(user);
+  const targets = [
+    { element: accountButton, fallback: initials },
+    { element: mobileAccountButton?.querySelector(".action-icon"), fallback: initials },
+    { element: avatarPreview, fallback: initials },
+  ];
+
+  targets.forEach(({ element, fallback }) => {
+    if (!element) {
+      return;
+    }
+    element.classList.toggle("has-avatar", Boolean(user && avatarUrl));
+    element.style.backgroundImage = user && avatarUrl ? `url("${avatarUrl}")` : "";
+    element.textContent = user && avatarUrl ? "" : fallback;
+  });
+
+  if (avatarEditor) {
+    avatarEditor.hidden = !user;
+  }
+  if (removeAvatarButton) {
+    removeAvatarButton.hidden = !user || !avatarUrl;
+  }
+}
+
+async function saveAvatarFromInput(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) {
+    return;
+  }
+  if (!currentUser) {
+    setAuthStatus("Сначала войдите в аккаунт, потом загрузите фото.", "error");
+    return;
+  }
+  if (!file.type.startsWith("image/")) {
+    setAuthStatus("Выберите картинку или фото.", "error");
+    return;
+  }
+
+  try {
+    const avatarDataUrl = await createAvatarDataUrl(file);
+    await persistAvatar(avatarDataUrl);
+    setAuthStatus("Аватарка сохранена.", "success");
+  } catch (error) {
+    setAuthStatus(`Аватарку не удалось сохранить: ${error.message}`, "error");
+  }
+}
+
+async function removeAvatar(event) {
+  event?.preventDefault?.();
+  if (!currentUser) {
+    return;
+  }
+  try {
+    await persistAvatar("");
+    setAuthStatus("Аватарка убрана.", "success");
+  } catch (error) {
+    setAuthStatus(`Аватарку не удалось убрать: ${error.message}`, "error");
+  }
+}
+
+async function persistAvatar(avatarDataUrl) {
+  const nextProfile = {
+    userId: currentUser.id,
+    avatarDataUrl,
+    updatedAt: Date.now(),
+  };
+  if (avatarDataUrl) {
+    saveProfile(nextProfile);
+  } else {
+    localStorage.removeItem(PROFILE_KEY);
+  }
+  currentUser = {
+    ...currentUser,
+    user_metadata: {
+      ...(currentUser.user_metadata || {}),
+      avatar_url: avatarDataUrl || null,
+    },
+  };
+  applyAvatarUi(currentUser);
+
+  if (supabaseClient?.auth?.updateUser) {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      data: { avatar_url: avatarDataUrl || null },
+    });
+    if (error) {
+      throw error;
+    }
+    if (data?.user) {
+      currentUser = data.user;
+      if (avatarDataUrl) {
+        saveProfile(nextProfile);
+      }
+      applyAvatarUi(currentUser);
+    }
+  }
+}
+
+function createAvatarDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Файл не прочитался."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("Картинка не открылась."));
+      image.onload = () => {
+        const size = 180;
+        const scale = Math.max(size / image.width, size / image.height);
+        const width = Math.max(size, image.width * scale);
+        const height = Math.max(size, image.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, size, size);
+        context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function getUserDisplayName(user) {
@@ -3506,6 +3665,7 @@ function clearAuthStorageOnThisDevice() {
   } catch {
     // Session storage may be unavailable in restricted mobile browsers.
   }
+  localStorage.removeItem(PROFILE_KEY);
 }
 
 function clearPrivateWorkspaceFromThisDevice() {
