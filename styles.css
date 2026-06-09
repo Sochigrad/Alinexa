@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg: #eef2f7;
   --ink: #111827;
   --muted: #667085;
@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260609-mobile-cabinet-sync-2"),
+    url("assets/welcome-background.png?v=20260609-avatar-cabinet-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -262,6 +262,17 @@ body:not(.is-authenticated) .topbar {
   cursor: pointer;
   pointer-events: auto;
   touch-action: manipulation;
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+}
+
+.avatar-button.has-avatar,
+.action-icon.has-avatar,
+.avatar-preview.has-avatar {
+  background-position: center;
+  background-size: cover;
+  color: transparent;
 }
 
 .welcome-screen {
@@ -1539,6 +1550,60 @@ textarea {
   border-left-color: var(--danger);
   background: #fff7ed;
   color: var(--danger);
+}
+
+.avatar-editor {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.74);
+  padding: 12px;
+}
+
+.avatar-preview {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 10%, white);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 950;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.avatar-editor-controls {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.avatar-upload-button {
+  display: inline-flex;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, white);
+  color: var(--accent-strong);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+#avatarInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .auth-actions {
