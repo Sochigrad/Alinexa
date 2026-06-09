@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-welcome-bg-1";
+const APP_BUILD_ID = "20260609-mobile-auth-sync-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -292,6 +292,7 @@ const signUpButton = document.querySelector("#signUpButton");
 const resetPasswordButton = document.querySelector("#resetPasswordButton");
 const accountButton = document.querySelector("#accountButton");
 const accountName = document.querySelector("#accountName");
+const accountTapTarget = document.querySelector("#accountTapTarget");
 const welcomeSignUpButton = document.querySelector("#welcomeSignUpButton");
 const welcomeSignInButton = document.querySelector("#welcomeSignInButton");
 let authMode = "sign-in";
@@ -336,12 +337,12 @@ function bindReliableTap(button, handler) {
 
 function bindAccountButton() {
   const accountCluster = document.querySelector(".account-cluster");
-  if (!accountButton && !accountCluster) {
+  if (!accountButton && !accountCluster && !accountTapTarget) {
     return;
   }
   let lastRunAt = 0;
   const openAccount = (event) => {
-    const target = event?.target?.closest?.("#accountButton,#accountName,.account-cluster");
+    const target = event?.target?.closest?.("#accountButton,#accountName,#accountTapTarget,.account-cluster");
     if (event && !target) {
       return;
     }
@@ -359,7 +360,7 @@ function bindAccountButton() {
     openAuthSheet();
   };
   window.openAlinexaAccount = openAccount;
-  [accountButton, accountName, accountCluster].filter(Boolean).forEach((target) => {
+  [accountButton, accountName, accountTapTarget, accountCluster].filter(Boolean).forEach((target) => {
     target.addEventListener("pointerdown", openAccount, { passive: false });
     target.addEventListener("touchstart", openAccount, { passive: false });
     target.addEventListener("touchend", openAccount, { passive: false });
@@ -2802,7 +2803,11 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
     return;
   }
 
-  const { data, error } = await fetchRemoteWorkspace();
+  let { data, error } = await fetchRemoteWorkspace();
+  if (!data && !error) {
+    await new Promise((resolve) => setTimeout(resolve, 650));
+    ({ data, error } = await fetchRemoteWorkspace());
+  }
 
   if (error) {
     setAuthStatus(`Вход выполнен, но доска не загрузилась из облака: ${error.message}`, "error");
@@ -2810,15 +2815,27 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   }
 
   if (!data) {
-    saveRecoveryBackup("before-empty-remote-init", state);
+    const localBoard = normalizeBoard(state);
+    if (hasUserBoardContent(localBoard)) {
+      saveRecoveryBackup("before-empty-remote-init", localBoard);
+      isApplyingRemoteWorkspace = true;
+      state = localBoard;
+      quickColumnId = state.columns[0]?.id || "";
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      isApplyingRemoteWorkspace = false;
+      markLocalWorkspaceChanged();
+      render();
+      await saveRemoteWorkspace();
+      return;
+    }
     isApplyingRemoteWorkspace = true;
     state = createPrivateEmptyBoard();
     quickColumnId = state.columns[0]?.id || "";
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     isApplyingRemoteWorkspace = false;
-    markLocalWorkspaceChanged();
+    hasUnsavedLocalChanges = false;
     render();
-    await saveRemoteWorkspace();
+    setAuthStatus("Вход выполнен. Облачная доска пока не найдена, пустая доска не сохранена в облако.", "success");
     return;
   }
 
@@ -2930,6 +2947,7 @@ async function fetchRemoteWorkspace(select = "board,theme,labels,updated_at") {
   });
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${WORKSPACE_TABLE}?${params}`, {
+      cache: "no-store",
       headers: {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
@@ -2955,6 +2973,7 @@ async function upsertRemoteWorkspace(payload) {
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${WORKSPACE_TABLE}?on_conflict=user_id`, {
       method: "POST",
+      cache: "no-store",
       headers: {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${token}`,
@@ -3001,17 +3020,23 @@ async function saveRemoteWorkspace() {
         existingData?.board?.columns && existingData?.board?.cards ? normalizeBoard(existingData.board) : null;
       const existingHasContent = existingBoard && hasBoardSyncContent(existingBoard);
       if (!existingError && existingHasContent) {
-      saveRecoveryBackup("blocked-empty-save", boardToSave);
-      state = existingBoard;
-      quickColumnId = state.columns[0]?.id || "";
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      remoteWorkspaceUpdatedAt = existingData.updated_at || remoteWorkspaceUpdatedAt;
-      hasUnsavedLocalChanges = false;
-      render();
-      setAuthStatus("Защита данных: пустая доска не перезаписала облако. Я восстановила карточки из облака.", "success");
-      return;
+        saveRecoveryBackup("blocked-empty-save", boardToSave);
+        state = existingBoard;
+        quickColumnId = state.columns[0]?.id || "";
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        remoteWorkspaceUpdatedAt = existingData.updated_at || remoteWorkspaceUpdatedAt;
+        hasUnsavedLocalChanges = false;
+        render();
+        setAuthStatus("Защита данных: пустая доска не перезаписала облако. Я восстановила карточки из облака.", "success");
+        return;
+      }
+      if (!existingError && !existingData) {
+        saveRecoveryBackup("blocked-empty-save-no-remote", boardToSave);
+        hasUnsavedLocalChanges = false;
+        setAuthStatus("Пустая доска не сохранена в облако. Добавьте карточку или дождитесь синхронизации.", "success");
+        return;
+      }
     }
-  }
   saveRecoveryBackup("before-remote-save", boardToSave);
   const themeToSave = await getRemoteSafeTheme();
   const saveStartedAt = Date.now();
