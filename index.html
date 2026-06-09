@@ -7,13 +7,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
-    <link rel="shortcut icon" href="/favicon.ico?v=20260609-mobile-cross-browser-sync-1" type="image/x-icon" />
-    <link rel="icon" href="/favicon.ico?v=20260609-mobile-cross-browser-sync-1" sizes="any" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260609-mobile-cross-browser-sync-1" />
-    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260609-mobile-cross-browser-sync-1" />
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260609-mobile-cross-browser-sync-1" />
-    <link rel="manifest" href="manifest.webmanifest?v=20260609-mobile-cross-browser-sync-1" />
-    <link rel="stylesheet" href="styles.css?v=20260609-mobile-cross-browser-sync-1" />
+    <link rel="shortcut icon" href="/favicon.ico?v=20260609-mobile-fallback-demo-clean-1" type="image/x-icon" />
+    <link rel="icon" href="/favicon.ico?v=20260609-mobile-fallback-demo-clean-1" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260609-mobile-fallback-demo-clean-1" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260609-mobile-fallback-demo-clean-1" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260609-mobile-fallback-demo-clean-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260609-mobile-fallback-demo-clean-1" />
+    <link rel="stylesheet" href="styles.css?v=20260609-mobile-fallback-demo-clean-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -29,9 +29,9 @@
           <span aria-hidden="true">↗</span>
         </button>
         <div class="account-cluster">
-          <span class="account-name" id="accountName" hidden></span>
-          <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт">IN</button>
-          <button class="account-tap-target" id="accountTapTarget" type="button" aria-label="Открыть личный кабинет"></button>
+          <span class="account-name" id="accountName" role="button" tabindex="0" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)" hidden></span>
+          <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)">IN</button>
+          <button class="account-tap-target" id="accountTapTarget" type="button" aria-label="Открыть личный кабинет" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)"></button>
         </div>
       </header>
 
@@ -51,8 +51,8 @@
           </p>
         </div>
         <div class="welcome-actions">
-          <button class="primary-button" id="welcomeSignUpButton" type="button">Зарегистрироваться</button>
-          <button class="secondary-button" id="welcomeSignInButton" type="button">У меня уже есть аккаунт</button>
+          <button class="primary-button" id="welcomeSignUpButton" type="button" onclick="return window.alinexaOpenRegistration ? window.alinexaOpenRegistration(event) : window.alinexaFallbackOpenRegistration(event)">Зарегистрироваться</button>
+          <button class="secondary-button" id="welcomeSignInButton" type="button" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)">У меня уже есть аккаунт</button>
         </div>
       </section>
 
@@ -360,14 +360,63 @@
           <button class="primary-button" id="signInButton" type="submit">Войти</button>
           <button class="ghost-button" id="signUpButton" type="button">Регистрация</button>
           <button class="ghost-button" id="resetPasswordButton" type="button">Сброс пароля</button>
-          <button class="danger-button" id="signOutButton" type="button" hidden>Выйти</button>
+          <button class="danger-button" id="signOutButton" type="button" onclick="return window.alinexaSignOut ? window.alinexaSignOut(event) : window.alinexaFallbackSignOut(event)" hidden>Выйти</button>
         </div>
       </form>
     </aside>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260609-mobile-cross-browser-sync-1";
+      window.ALINEXA_BUILD_ID = "20260609-mobile-fallback-demo-clean-1";
+      window.alinexaFallbackOpenSheet = (mode, event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        const sheet = document.querySelector("#authSheet");
+        const scrim = document.querySelector("#scrim");
+        if (!sheet) return false;
+        const isSignUp = mode === "sign-up";
+        document.querySelectorAll(".sheet").forEach((item) => {
+          if (item !== sheet) {
+            item.classList.remove("is-open");
+            item.setAttribute("aria-hidden", "true");
+            item.hidden = true;
+          }
+        });
+        document.body.classList.add("sheet-open");
+        document.documentElement.classList.add("sheet-open");
+        if (scrim) scrim.hidden = false;
+        sheet.hidden = false;
+        sheet.removeAttribute("hidden");
+        sheet.classList.add("is-open");
+        sheet.setAttribute("aria-hidden", "false");
+        sheet.style.display = "block";
+        sheet.style.visibility = "visible";
+        sheet.style.pointerEvents = "auto";
+        sheet.style.opacity = "1";
+        document.querySelector("#authTitle").textContent = isSignUp ? "Регистрация" : "Личный кабинет";
+        document.querySelector("#authNameGrid").hidden = !isSignUp;
+        document.querySelector("#authPasswordRepeatLabel").hidden = !isSignUp;
+        document.querySelector("#signInButton").textContent = isSignUp ? "Зарегистрироваться" : "Войти";
+        document.querySelector("#signOutButton").hidden = !document.body.classList.contains("is-authenticated");
+        document.querySelector("#authStatus").textContent = isSignUp
+          ? "Создайте аккаунт: e-mail, имя, фамилия и пароль дважды."
+          : "Войдите в аккаунт через e-mail и пароль.";
+        return false;
+      };
+      window.alinexaFallbackOpenAuth = (event) => window.alinexaFallbackOpenSheet("sign-in", event);
+      window.alinexaFallbackOpenRegistration = (event) => window.alinexaFallbackOpenSheet("sign-up", event);
+      window.alinexaFallbackSignOut = (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        try {
+          Object.keys(localStorage)
+            .filter((key) => key === "alinexa-auth-session-v1" || key.startsWith("sb-") || key.toLowerCase().includes("supabase"))
+            .forEach((key) => localStorage.removeItem(key));
+          sessionStorage.clear();
+        } catch {}
+        window.location.href = "/?signed_out=1&v=20260609-mobile-fallback-demo-clean-1";
+        return false;
+      };
       window.addEventListener("load", () => {
         if ("caches" in window) {
           caches
@@ -385,7 +434,7 @@
         }
       });
     </script>
-    <script src="app.js?v=20260609-mobile-cross-browser-sync-1" defer></script>
+    <script src="app.js?v=20260609-mobile-fallback-demo-clean-1" defer></script>
   </body>
 </html>
 
