@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260609-mobile-card-sheet-layout-1"),
+    url("assets/welcome-background.png?v=20260609-mobile-auth-visible-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -1133,6 +1133,23 @@ body.auth-force-open #authSheet {
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
+}
+
+@media (pointer: coarse), (max-width: 940px) {
+  html.auth-force-open #authSheet,
+  body.auth-force-open #authSheet {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: var(--visual-viewport-height, 100vh) !important;
+    max-height: var(--visual-viewport-height, 100vh) !important;
+    border-radius: 0 !important;
+    transform: translate3d(0, 0, 0) !important;
+    overflow-y: auto !important;
+  }
 }
 
 .sheet-handle {
