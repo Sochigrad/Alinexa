@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-archive-mobile-1";
+const APP_BUILD_ID = "20260609-mobile-cross-browser-sync-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -376,7 +376,7 @@ let lastCriticalActionId = "";
 
 function runCriticalAction(event) {
   const target = event.target?.closest?.(
-    "#signInButton,#resetPasswordButton,#signOutButton,#closeAuthButton",
+    "#welcomeSignUpButton,#welcomeSignInButton,#signInButton,#signUpButton,#resetPasswordButton,#signOutButton,#closeAuthButton",
   );
   if (!target || target.disabled) {
     return;
@@ -399,6 +399,7 @@ function runCriticalAction(event) {
   const actions = {
     welcomeSignUpButton: openRegistrationSheet,
     welcomeSignInButton: openAuthSheet,
+    signUpButton: toggleAuthMode,
     accountButton: openAuthSheet,
     signInButton: handleAuthSubmit,
     resetPasswordButton: sendPasswordResetEmail,
@@ -408,11 +409,18 @@ function runCriticalAction(event) {
   actions[target.id]?.(event);
 }
 
+function bindGlobalCriticalActions() {
+  ["pointerdown", "touchend", "click"].forEach((eventName) => {
+    document.addEventListener(eventName, runCriticalAction, { capture: true, passive: false });
+  });
+}
+
 bindActionButton("#addCardButton", () => openCardSheet());
 bindActionButton("#addColumnButton", () => openColumnSheet());
 bindActionButton("#searchButton", openSearchSheet);
 bindActionButton("#themeButton", openThemeSheet);
 bindActionButton("#voiceButton", openVoiceSheet);
+bindGlobalCriticalActions();
 archiveButton?.addEventListener("click", openArchiveSheet);
 document.querySelectorAll(".bottom-action").forEach((button) => {
   button.addEventListener("pointerdown", (event) => event.stopPropagation());
@@ -3447,6 +3455,7 @@ async function signOut(event) {
   setAuthBusy(true);
   currentUser = null;
   currentSession = null;
+  clearAuthStorageOnThisDevice();
   clearPrivateWorkspaceFromThisDevice();
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
@@ -3466,6 +3475,7 @@ async function signOut(event) {
   } finally {
     currentUser = null;
     currentSession = null;
+    clearAuthStorageOnThisDevice();
     clearPrivateWorkspaceFromThisDevice();
     authPasswordInput.value = "";
     authPasswordRepeatInput.value = "";
@@ -3476,6 +3486,31 @@ async function signOut(event) {
     closeSheets();
     setAuthBusy(false);
     isSigningOut = false;
+  }
+}
+
+function clearAuthStorageOnThisDevice() {
+  try {
+    const keys = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (
+        key === AUTH_SESSION_KEY ||
+        key === `sb-${new URL(SUPABASE_URL).hostname.split(".")[0]}-auth-token` ||
+        key?.startsWith("sb-") ||
+        key?.toLowerCase().includes("supabase")
+      ) {
+        keys.push(key);
+      }
+    }
+    keys.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+  }
+  try {
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+  } catch {
+    // Session storage may be unavailable in restricted mobile browsers.
   }
 }
 
