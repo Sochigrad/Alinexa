@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-avatar-cabinet-1";
+const APP_BUILD_ID = "20260609-auth-sheet-force-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -2435,8 +2435,6 @@ async function initAuth() {
         openSheet(authSheet);
         setAuthStatus("Аккаунт подтвержден. Вы уже в своем кабинете.", "success");
         clearAuthUrl();
-      } else if (authMode === "sign-in" && authSheet.classList.contains("is-open")) {
-        closeSheets();
       }
     }
     if (!currentUser && event === "SIGNED_OUT") {
@@ -3228,7 +3226,7 @@ async function saveRemoteWorkspace() {
 
 function openAuthSheet() {
   setAuthMode("sign-in");
-  openSheet(authSheet);
+  forceOpenAuthSheet();
   if (!currentUser && shouldAutoFocusSheet()) {
     focusFieldAtSheetStart(authSheet, authEmailInput);
   }
@@ -3236,10 +3234,33 @@ function openAuthSheet() {
 
 function openRegistrationSheet() {
   setAuthMode("sign-up");
-  openSheet(authSheet);
+  forceOpenAuthSheet();
   if (shouldAutoFocusSheet()) {
     focusFieldAtSheetStart(authSheet, authEmailInput);
   }
+}
+
+function forceOpenAuthSheet() {
+  openSheet(authSheet);
+  document.documentElement.classList.add("auth-force-open");
+  document.body.classList.add("auth-force-open");
+  authSheet.hidden = false;
+  authSheet.removeAttribute("hidden");
+  authSheet.classList.add("is-open");
+  authSheet.setAttribute("aria-hidden", "false");
+  authSheet.style.display = "block";
+  authSheet.style.visibility = "visible";
+  authSheet.style.pointerEvents = "auto";
+  authSheet.style.opacity = "1";
+  authSheet.style.zIndex = "2147483600";
+  scrimEl.hidden = false;
+  scrimEl.style.zIndex = "2147483500";
+  requestAnimationFrame(() => {
+    authSheet.hidden = false;
+    authSheet.removeAttribute("hidden");
+    authSheet.classList.add("is-open");
+    authSheet.setAttribute("aria-hidden", "false");
+  });
 }
 
 function handleAuthSubmit(event) {
@@ -3935,10 +3956,14 @@ function closeSheets() {
     item.style.removeProperty("visibility");
     item.style.removeProperty("pointer-events");
     item.style.removeProperty("opacity");
+    item.style.removeProperty("z-index");
   });
   scrimEl.hidden = true;
+  scrimEl.style.removeProperty("z-index");
   document.documentElement.classList.remove("sheet-open");
+  document.documentElement.classList.remove("auth-force-open");
   document.body.classList.remove("sheet-open");
+  document.body.classList.remove("auth-force-open");
   activeCardId = null;
   activeColumnId = null;
 }
