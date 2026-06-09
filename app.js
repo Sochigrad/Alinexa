@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-card-sheet-layout-1";
+const APP_BUILD_ID = "20260609-mobile-auth-visible-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -3244,6 +3244,17 @@ function forceOpenAuthSheet() {
   openSheet(authSheet);
   document.documentElement.classList.add("auth-force-open");
   document.body.classList.add("auth-force-open");
+  showAuthSheetNow();
+  scrimEl.hidden = false;
+  scrimEl.style.zIndex = "2147483500";
+  requestAnimationFrame(() => {
+    showAuthSheetNow();
+    setTimeout(showAuthSheetNow, 80);
+    setTimeout(showAuthSheetNow, 240);
+  });
+}
+
+function showAuthSheetNow() {
   authSheet.hidden = false;
   authSheet.removeAttribute("hidden");
   authSheet.classList.add("is-open");
@@ -3253,14 +3264,23 @@ function forceOpenAuthSheet() {
   authSheet.style.pointerEvents = "auto";
   authSheet.style.opacity = "1";
   authSheet.style.zIndex = "2147483600";
-  scrimEl.hidden = false;
-  scrimEl.style.zIndex = "2147483500";
-  requestAnimationFrame(() => {
-    authSheet.hidden = false;
-    authSheet.removeAttribute("hidden");
-    authSheet.classList.add("is-open");
-    authSheet.setAttribute("aria-hidden", "false");
-  });
+  if (isMobileSheetViewport()) {
+    authSheet.style.position = "fixed";
+    authSheet.style.top = "0";
+    authSheet.style.right = "0";
+    authSheet.style.bottom = "auto";
+    authSheet.style.left = "0";
+    authSheet.style.width = "100vw";
+    authSheet.style.height = "var(--visual-viewport-height, 100vh)";
+    authSheet.style.maxHeight = "var(--visual-viewport-height, 100vh)";
+    authSheet.style.borderRadius = "0";
+    authSheet.style.transform = "translate3d(0, 0, 0)";
+    authSheet.style.overflowY = "auto";
+  }
+}
+
+function isMobileSheetViewport() {
+  return window.innerWidth <= 940 || Boolean(window.matchMedia?.("(pointer: coarse)")?.matches);
 }
 
 function handleAuthSubmit(event) {
@@ -3957,6 +3977,17 @@ function closeSheets() {
     item.style.removeProperty("pointer-events");
     item.style.removeProperty("opacity");
     item.style.removeProperty("z-index");
+    item.style.removeProperty("position");
+    item.style.removeProperty("top");
+    item.style.removeProperty("right");
+    item.style.removeProperty("bottom");
+    item.style.removeProperty("left");
+    item.style.removeProperty("width");
+    item.style.removeProperty("height");
+    item.style.removeProperty("max-height");
+    item.style.removeProperty("border-radius");
+    item.style.removeProperty("transform");
+    item.style.removeProperty("overflow-y");
   });
   scrimEl.hidden = true;
   scrimEl.style.removeProperty("z-index");
