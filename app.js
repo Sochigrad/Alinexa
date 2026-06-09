@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-auth-timeout-column-clean-1";
+const APP_BUILD_ID = "20260609-mobile-direct-login-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -3387,18 +3387,17 @@ function setAuthMode(mode) {
 async function signInWithEmail(event) {
   event?.preventDefault?.();
   event?.stopPropagation?.();
-  if (!(await ensureAuthReady())) {
-    return;
-  }
-
   const email = authEmailInput.value.trim();
   const password = authPasswordInput.value;
   if (!validateAuthFields(email, password)) {
     return;
   }
 
+  const authReady = await ensureAuthReady({ quiet: true });
   setAuthBusy(true);
-  const { data, error } = await signInWithPasswordResilient(email, password);
+  const { data, error } = authReady
+    ? await signInWithPasswordResilient(email, password)
+    : await signInWithPasswordDirect(email, password);
   setAuthBusy(false);
   if (error) {
     setAuthStatus(`Войти не получилось: ${translateAuthError(error.message)}`, "error");
@@ -3470,16 +3469,18 @@ async function signInWithPasswordDirect(email, password) {
       return { data: null, error: new Error("Supabase не вернул сессию.") };
     }
     storeDirectAuthSession(session);
-    await withTimeout(
-      supabaseClient.auth
-        .setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        })
-        .catch(() => null),
-      1800,
-      null,
-    );
+    if (supabaseClient?.auth?.setSession) {
+      await withTimeout(
+        supabaseClient.auth
+          .setSession({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          })
+          .catch(() => null),
+        1800,
+        null,
+      );
+    }
     return { data: { session, user: session.user || data.user || null }, error: null };
   } catch (error) {
     return { data: null, error };
@@ -3856,7 +3857,7 @@ function clearPrivateWorkspaceFromThisDevice() {
   render();
 }
 
-async function ensureAuthReady() {
+async function ensureAuthReady({ quiet = false } = {}) {
   if (supabaseClient) {
     return true;
   }
@@ -3864,10 +3865,12 @@ async function ensureAuthReady() {
   if (supabaseClient) {
     return true;
   }
-  setAuthStatus(
-    "Не удалось загрузить подключение к Supabase. Обновите страницу и попробуйте еще раз.",
-    "error",
-  );
+  if (!quiet) {
+    setAuthStatus(
+      "Не удалось загрузить подключение к Supabase. Обновите страницу и попробуйте еще раз.",
+      "error",
+    );
+  }
   return false;
 }
 
@@ -3921,7 +3924,7 @@ function translateAuthError(message) {
     return "сейчас Supabase ограничил отправку писем. Подождите немного и попробуйте еще раз, либо подключите свой SMTP для писем Alinexa.";
   }
   if (isNetworkLikeAuthError(message)) {
-    return "не удалось связаться с Supabase. Обновите страницу по свежей ссылке и попробуйте еще раз. Если повторяется, вероятнее всего сработал лимит отправки писем.";
+    return "не удалось связаться с Supabase. Проверьте интернет или VPN, обновите страницу по свежей ссылке и попробуйте еще раз.";
   }
   if (/already registered|already been registered|User already/i.test(message)) {
     return "этот e-mail уже зарегистрирован. Попробуйте войти или сбросить пароль.";
