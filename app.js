@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-auth-sync-1";
+const APP_BUILD_ID = "20260609-archive-mobile-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -4433,32 +4433,14 @@ function renderArchive() {
   if (!archiveList) {
     return;
   }
-  const backups = loadRecoveryBackups();
   const archivedCards = normalizeArchivedCards(state.archivedCards).sort(
     (a, b) => Number(b.archivedAt || 0) - Number(a.archivedAt || 0),
   );
   archiveList.innerHTML = "";
-  if (!backups.length && !archivedCards.length) {
-    archiveList.innerHTML = '<div class="empty-state">В архиве пока пусто</div>';
+  if (!archivedCards.length) {
+    archiveList.innerHTML = '<div class="empty-state">В архиве пока пусто. Сюда попадают карточки, отмеченные галочкой в колонке «Сделано».</div>';
     return;
   }
-
-  backups.forEach((backup) => {
-    const item = document.createElement("article");
-    item.className = "archive-item";
-    const board = normalizeBoard(backup.board);
-    const activeCount = board.cards.length;
-    const archivedCount = normalizeArchivedCards(board.archivedCards).length;
-    item.innerHTML = `
-      <div>
-        <strong>Резервная копия</strong>
-        <span>${formatArchiveDate(backup.createdAt)} · ${activeCount} карточек · ${archivedCount} в архиве</span>
-      </div>
-      <button class="ghost-button archive-restore" type="button">Восстановить</button>
-    `;
-    item.querySelector(".archive-restore")?.addEventListener("click", () => restoreRecoveryBackup(backup.id));
-    archiveList.append(item);
-  });
 
   archivedCards.forEach((card) => {
     const item = document.createElement("article");
