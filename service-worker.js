@@ -1,4 +1,4 @@
-﻿self.__ALINEXA_SW_VERSION__ = "20260608-mobile-account-tap-3";
+﻿self.__ALINEXA_SW_VERSION__ = "20260609-fix-encoding-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
@@ -71,4 +71,5 @@ self.addEventListener("notificationclick", (event) => {
     }),
   );
 });
+
 
