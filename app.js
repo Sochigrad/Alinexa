@@ -1,4 +1,4 @@
-const STORAGE_KEY = "taskflow-board-v1";
+﻿const STORAGE_KEY = "taskflow-board-v1";
 const THEME_KEY = "taskflow-theme-v1";
 const LABELS_KEY = "taskflow-labels-v1";
 const LOCAL_UPDATED_KEY = "alinexa-local-updated-v1";
@@ -6,7 +6,7 @@ const AUTH_SESSION_KEY = "alinexa-auth-session-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260608-mobile-account-tap-3";
+const APP_BUILD_ID = "20260609-fix-encoding-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -3570,10 +3570,6 @@ function openCardSheet(cardId = null, columnId = quickColumnId) {
   renderColumnOptions();
   renderLabelOptions();
 
-  sheetTitle.textContent = card ? "Редактировать карточку" : "Новая карточка";
-  sheetTitle.innerHTML = card
-    ? '<span class="sheet-title-main">Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ</span><span class="sheet-title-sub">ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÑƒ</span>'
-    : '<span class="sheet-title-main">ÐÐ¾Ð²Ð°Ñ</span><span class="sheet-title-sub">ÐºÐ°Ñ€Ñ‚Ð¾Ñ‡ÐºÐ°</span>';
   sheetTitle.innerHTML = card
     ? '<span class="sheet-title-main">&#1056;&#1077;&#1076;&#1072;&#1082;&#1090;&#1080;&#1088;&#1086;&#1074;&#1072;&#1090;&#1100;</span><span class="sheet-title-sub">&#1082;&#1072;&#1088;&#1090;&#1086;&#1095;&#1082;&#1091;</span>'
     : '<span class="sheet-title-main">&#1053;&#1086;&#1074;&#1072;&#1103;</span><span class="sheet-title-sub">&#1082;&#1072;&#1088;&#1090;&#1086;&#1095;&#1082;&#1072;</span>';
@@ -4651,3 +4647,4 @@ function hexToRgba(hex, alpha) {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
