@@ -7,13 +7,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
-    <link rel="shortcut icon" href="/favicon.ico?v=20260609-mobile-cloud-session-1" type="image/x-icon" />
-    <link rel="icon" href="/favicon.ico?v=20260609-mobile-cloud-session-1" sizes="any" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260609-mobile-cloud-session-1" />
-    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260609-mobile-cloud-session-1" />
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260609-mobile-cloud-session-1" />
-    <link rel="manifest" href="manifest.webmanifest?v=20260609-mobile-cloud-session-1" />
-    <link rel="stylesheet" href="styles.css?v=20260609-mobile-cloud-session-1" />
+    <link rel="shortcut icon" href="/favicon.ico?v=20260612-board-redesign-1" type="image/x-icon" />
+    <link rel="icon" href="/favicon.ico?v=20260612-board-redesign-1" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260612-board-redesign-1" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260612-board-redesign-1" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260612-board-redesign-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260612-board-redesign-1" />
+    <link rel="stylesheet" href="styles.css?v=20260612-board-redesign-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -25,13 +25,21 @@
             <p>мобильная доска</p>
           </div>
         </div>
-        <button class="archive-button" id="archiveButton" type="button" aria-label="Архив">
-          <span aria-hidden="true">↗</span>
-        </button>
-        <div class="account-cluster">
-          <span class="account-name" id="accountName" role="button" tabindex="0" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)" hidden></span>
-          <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)">IN</button>
-          <button class="account-tap-target" id="accountTapTarget" type="button" aria-label="Открыть личный кабинет" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)"></button>
+        <nav class="top-tabs" aria-label="Разделы Alinexa">
+          <button class="top-tab is-active" type="button">Доска</button>
+          <button class="top-tab" type="button">Фокус</button>
+          <button class="top-tab" type="button">Календарь</button>
+          <button class="top-tab" type="button">Отчёты</button>
+        </nav>
+        <div class="top-actions">
+          <button class="archive-button" id="archiveButton" type="button" aria-label="Архив">
+            <span aria-hidden="true">↗</span>
+          </button>
+          <div class="account-cluster">
+            <span class="account-name" id="accountName" role="button" tabindex="0" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)" hidden></span>
+            <button class="avatar-button" id="accountButton" type="button" aria-label="Аккаунт" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)">IN</button>
+            <button class="account-tap-target" id="accountTapTarget" type="button" aria-label="Открыть личный кабинет" onclick="return window.alinexaOpenAuth ? window.alinexaOpenAuth(event) : window.alinexaFallbackOpenAuth(event)"></button>
+          </div>
         </div>
       </header>
 
@@ -379,7 +387,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260609-mobile-cloud-session-1";
+      window.ALINEXA_BUILD_ID = "20260612-board-redesign-1";
       window.alinexaFallbackOpenSheet = (mode, event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
@@ -439,7 +447,7 @@
             .forEach((key) => localStorage.removeItem(key));
           sessionStorage.clear();
         } catch {}
-        window.location.href = "/?signed_out=1&v=20260609-mobile-cloud-session-1";
+        window.location.href = "/?signed_out=1&v=20260612-board-redesign-1";
         return false;
       };
       window.addEventListener("load", () => {
@@ -459,7 +467,7 @@
         }
       });
     </script>
-    <script src="app.js?v=20260609-mobile-cloud-session-1" defer></script>
+    <script src="app.js?v=20260612-board-redesign-1" defer></script>
   </body>
 </html>
 
