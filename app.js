@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260612-compact-board-scroll-1";
+const APP_BUILD_ID = "20260612-inbox-scroll-glass-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -17,6 +17,8 @@ const SUPABASE_CDN_URLS = [
   "https://unpkg.com/@supabase/supabase-js@2",
 ];
 const PUSH_SUBSCRIPTIONS_TABLE = "alinexa_push_subscriptions";
+const INBOX_COLUMN_ID = "inbox";
+const INBOX_COLUMN_TITLE = "Входящие";
 const VAPID_PUBLIC_KEY =
   "BBZsesectlp8qreP1O5lFR62o1LQRUAOd-T44sU3wpR3JhFKyv2hQyHK3XPG-7fOdaj-CO4Rze9TkEwWdkr_A5U";
 const COLUMN_COLORS = [
@@ -34,6 +36,7 @@ const COLUMN_COLORS = [
   "#a855f7",
 ];
 const COLUMN_COLOR_BY_ID = {
+  inbox: "#f97316",
   backlog: "#2563eb",
   doing: "#f97316",
   review: "#8b5cf6",
@@ -108,6 +111,7 @@ const defaultLabels = [
 
 const defaultBoard = {
   columns: [
+    { id: "inbox", title: "Входящие" },
     { id: "backlog", title: "Бэклог" },
     { id: "doing", title: "В работе" },
     { id: "review", title: "Проверка" },
@@ -180,6 +184,8 @@ let isRecording = false;
 let committedVoiceText = "";
 
 const boardEl = document.querySelector("#board");
+const boardScrollEl = document.querySelector("#boardScroll");
+const boardScrollInner = document.querySelector("#boardScrollInner");
 const totalCardsEl = document.querySelector("#totalCards");
 const doneCardsEl = document.querySelector("#doneCards");
 const focusCardsEl = document.querySelector("#focusCards");
@@ -443,6 +449,9 @@ document.addEventListener("touchcancel", cancelTouchDrag);
 document.addEventListener("pointermove", moveColumnDrag, { passive: false });
 document.addEventListener("pointerup", finishColumnDrag, { passive: false });
 document.addEventListener("pointercancel", cancelColumnDrag);
+boardEl?.addEventListener("scroll", syncBoardScrollBar, { passive: true });
+boardScrollEl?.addEventListener("scroll", syncBoardFromScrollBar, { passive: true });
+window.addEventListener("resize", updateBoardScrollBar);
 
 cardForm.addEventListener("submit", saveCard);
 columnForm.addEventListener("submit", saveColumn);
@@ -815,6 +824,31 @@ function getNextColumnColor() {
   return COLUMN_COLORS.find((color) => !used.has(color.toLowerCase())) || COLUMN_COLORS[state.columns.length % COLUMN_COLORS.length];
 }
 
+function createInboxColumn() {
+  return { id: INBOX_COLUMN_ID, title: INBOX_COLUMN_TITLE, color: COLUMN_COLOR_BY_ID[INBOX_COLUMN_ID] };
+}
+
+function ensureInboxColumn(board) {
+  if (!board?.columns) {
+    return;
+  }
+  if (board.deletedColumns) {
+    delete board.deletedColumns[INBOX_COLUMN_ID];
+  }
+  const inboxIndex = board.columns.findIndex((column) => String(column?.id || "") === INBOX_COLUMN_ID);
+  if (inboxIndex === -1) {
+    board.columns.unshift(createInboxColumn());
+    return;
+  }
+  const [inboxColumn] = board.columns.splice(inboxIndex, 1);
+  board.columns.unshift({
+    ...inboxColumn,
+    id: INBOX_COLUMN_ID,
+    title: String(inboxColumn.title || "").trim() || INBOX_COLUMN_TITLE,
+    color: normalizeColumnColor(inboxColumn.color) || COLUMN_COLOR_BY_ID[INBOX_COLUMN_ID],
+  });
+}
+
 function normalizeBoard(board) {
   const now = Date.now();
   const nextBoard = {
@@ -841,6 +875,8 @@ function normalizeBoard(board) {
       usedColumnColors.add(color.toLowerCase());
       return { ...column, color };
     });
+  ensureInboxColumn(nextBoard);
+  deletedColumnIds.delete(INBOX_COLUMN_ID);
   if (!nextBoard.columns.length) {
     nextBoard.columns = defaultBoard.columns.map((column, index) => {
       const color = pickColumnColor(column, index, usedColumnColors);
@@ -1057,6 +1093,9 @@ function renderBoardContent() {
 
     const section = document.createElement("section");
     section.className = "column";
+    if (safeColumn.id === INBOX_COLUMN_ID) {
+      section.classList.add("is-inbox-column");
+    }
     section.dataset.columnId = safeColumn.id;
     section.style.setProperty("--column-color", columnColor);
     section.addEventListener("dragover", onDragOver);
@@ -1068,9 +1107,11 @@ function renderBoardContent() {
     header.innerHTML = `
       <button class="column-color-handle" type="button" aria-label="Переместить колонку ${escapeHtml(safeColumn.title)}"></button>
       <div class="column-title">
+        ${safeColumn.id === INBOX_COLUMN_ID ? '<span class="inbox-icon" aria-hidden="true"></span>' : ""}
         <button class="column-name-button" type="button" aria-label="Переименовать ${escapeHtml(safeColumn.title)}">
           ${escapeHtml(safeColumn.title)}
         </button>
+        ${safeColumn.id === INBOX_COLUMN_ID ? '<span class="inbox-subtitle">быстрые задачи и идеи</span>' : ""}
       </div>
       <div class="column-actions">
         <span class="column-count" aria-label="Карточек в колонке">${cards.length}</span>
@@ -1127,6 +1168,7 @@ function renderBoardContent() {
   addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить новую колонку</strong>';
   addColumnTile.addEventListener("click", () => openColumnSheet());
   boardEl.appendChild(addColumnTile);
+  requestAnimationFrame(updateBoardScrollBar);
 
   // Deadline reminders are temporarily disabled to keep auth and board sync stable.
 }
@@ -1147,6 +1189,9 @@ function renderBoardFallback() {
     const title = String(column?.title || `Column ${columnIndex + 1}`);
     const section = document.createElement("section");
     section.className = "column";
+    if (columnId === INBOX_COLUMN_ID) {
+      section.classList.add("is-inbox-column");
+    }
     section.dataset.columnId = columnId;
     section.style.setProperty("--column-color", normalizeColumnColor(column?.color) || getDefaultColumnColor(column, columnIndex));
     section.addEventListener("dragover", onDragOver);
@@ -1209,6 +1254,42 @@ function renderBoardFallback() {
   addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить новую колонку</strong>';
   addColumnTile.addEventListener("click", () => openColumnSheet());
   boardEl.appendChild(addColumnTile);
+  requestAnimationFrame(updateBoardScrollBar);
+}
+
+let isSyncingBoardScroll = false;
+
+function updateBoardScrollBar() {
+  if (!boardEl || !boardScrollEl || !boardScrollInner) {
+    return;
+  }
+
+  const scrollWidth = Math.max(boardEl.scrollWidth, boardEl.clientWidth);
+  boardScrollInner.style.width = `${scrollWidth}px`;
+  boardScrollEl.hidden = scrollWidth <= boardEl.clientWidth + 2;
+  boardScrollEl.scrollLeft = boardEl.scrollLeft;
+}
+
+function syncBoardScrollBar() {
+  if (isSyncingBoardScroll || !boardEl || !boardScrollEl) {
+    return;
+  }
+  isSyncingBoardScroll = true;
+  boardScrollEl.scrollLeft = boardEl.scrollLeft;
+  requestAnimationFrame(() => {
+    isSyncingBoardScroll = false;
+  });
+}
+
+function syncBoardFromScrollBar() {
+  if (isSyncingBoardScroll || !boardEl || !boardScrollEl) {
+    return;
+  }
+  isSyncingBoardScroll = true;
+  boardEl.scrollLeft = boardScrollEl.scrollLeft;
+  requestAnimationFrame(() => {
+    isSyncingBoardScroll = false;
+  });
 }
 
 function getSafeStatusId(status, focus) {
@@ -4013,7 +4094,7 @@ function openLabelsSheet() {
 function openVoiceSheet() {
   renderColumnOptions();
   renderLabelOptions();
-  voiceColumnInput.value = getSafeColumnValue(quickColumnId);
+  voiceColumnInput.value = getSafeColumnValue(INBOX_COLUMN_ID, quickColumnId);
   voiceLabelInput.value = getSafeLabelValue();
   voiceFocusInput.checked = true;
   voiceStatusInput.value = "today";
@@ -4322,21 +4403,22 @@ async function saveVoiceCard(event) {
 
   const voiceTask = splitVoiceTaskText(text);
   const createdAt = Date.now();
+  const targetColumnId = getSafeColumnValue(INBOX_COLUMN_ID, voiceColumnInput.value, quickColumnId);
   state.cards.push({
     id: crypto.randomUUID(),
-    columnId: voiceColumnInput.value,
+    columnId: targetColumnId,
     title: voiceTask.title,
     description: voiceTask.description,
     label: voiceLabelInput.value,
     focus: voiceFocusInput.checked,
     status: voiceStatusInput.value,
-    order: getNextOrder(voiceColumnInput.value),
+    order: getNextOrder(targetColumnId),
     createdAt,
     updatedAt: createdAt,
   });
   state = normalizeBoard(state);
 
-  quickColumnId = voiceColumnInput.value;
+  quickColumnId = targetColumnId;
   const savePromise = persist({ immediate: true });
   render();
   clearVoiceText();

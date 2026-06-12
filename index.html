@@ -7,13 +7,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Alinexa" />
     <title>Alinexa</title>
-    <link rel="shortcut icon" href="/favicon.ico?v=20260612-compact-board-scroll-1" type="image/x-icon" />
-    <link rel="icon" href="/favicon.ico?v=20260612-compact-board-scroll-1" sizes="any" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260612-compact-board-scroll-1" />
-    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260612-compact-board-scroll-1" />
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260612-compact-board-scroll-1" />
-    <link rel="manifest" href="manifest.webmanifest?v=20260612-compact-board-scroll-1" />
-    <link rel="stylesheet" href="styles.css?v=20260612-compact-board-scroll-1" />
+    <link rel="shortcut icon" href="/favicon.ico?v=20260612-inbox-scroll-glass-1" type="image/x-icon" />
+    <link rel="icon" href="/favicon.ico?v=20260612-inbox-scroll-glass-1" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=20260612-inbox-scroll-glass-1" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=20260612-inbox-scroll-glass-1" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=20260612-inbox-scroll-glass-1" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260612-inbox-scroll-glass-1" />
+    <link rel="stylesheet" href="styles.css?v=20260612-inbox-scroll-glass-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -74,6 +74,9 @@
       </section>
 
       <main class="board" id="board" aria-label="Колонки задач"></main>
+      <div class="board-scroll" id="boardScroll" aria-hidden="true">
+        <div class="board-scroll-inner" id="boardScrollInner"></div>
+      </div>
 
       <nav class="bottom-bar" aria-label="Быстрые действия">
         <button class="bottom-action is-active" id="addCardButton" type="button">
@@ -381,7 +384,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260612-compact-board-scroll-1";
+      window.ALINEXA_BUILD_ID = "20260612-inbox-scroll-glass-1";
       window.alinexaFallbackOpenSheet = (mode, event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
@@ -441,7 +444,7 @@
             .forEach((key) => localStorage.removeItem(key));
           sessionStorage.clear();
         } catch {}
-        window.location.href = "/?signed_out=1&v=20260612-compact-board-scroll-1";
+        window.location.href = "/?signed_out=1&v=20260612-inbox-scroll-glass-1";
         return false;
       };
       window.addEventListener("load", () => {
@@ -461,7 +464,8 @@
         }
       });
     </script>
-    <script src="app.js?v=20260612-compact-board-scroll-1" defer></script>
+    <script src="app.js?v=20260612-inbox-scroll-glass-1" defer></script>
   </body>
 </html>
+
 

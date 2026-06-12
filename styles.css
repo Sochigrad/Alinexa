@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260612-compact-board-scroll-1"),
+    url("assets/welcome-background.png?v=20260612-inbox-scroll-glass-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -2695,3 +2695,268 @@ body.is-authenticated .app-shell {
     min-height: calc(100svh - 234px);
   }
 }
+
+/* Inbox board polish, glass header, and reliable horizontal access. */
+body.is-authenticated {
+  overflow: hidden;
+}
+
+body.is-authenticated .app-shell {
+  overflow: hidden;
+}
+
+.topbar {
+  margin: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.13);
+  backdrop-filter: blur(24px) saturate(1.08);
+  -webkit-backdrop-filter: blur(24px) saturate(1.08);
+}
+
+.board-meta {
+  width: min(1320px, calc(100vw - 56px));
+  margin: 8px auto 22px;
+  grid-template-columns: minmax(270px, 1.45fr) repeat(3, minmax(150px, 1fr));
+  gap: 0;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
+  padding: 18px 20px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.board-meta::before {
+  content: "Сегодня на доске\A ваша продуктивность в одном взгляде";
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  white-space: pre-line;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.board-meta div {
+  min-width: 0;
+  border: 0;
+  border-left: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 10px 26px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.board-meta div::before {
+  content: "";
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  margin-right: 14px;
+  float: left;
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 70%, white), color-mix(in srgb, var(--accent) 86%, #2563eb));
+  box-shadow: 0 10px 22px rgba(20, 184, 166, 0.24);
+}
+
+.board-meta div:nth-child(2)::before {
+  background: linear-gradient(135deg, #74a8ff, #3b82f6);
+}
+
+.board-meta div:nth-child(3)::before {
+  background: linear-gradient(135deg, #68e39a, #22c55e);
+}
+
+.board-meta div:nth-child(4)::before {
+  background: linear-gradient(135deg, #b998ff, #8b5cf6);
+}
+
+.board-meta strong {
+  font-size: 22px;
+  line-height: 1.12;
+}
+
+.board-meta span {
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.board {
+  width: 100vw;
+  max-width: none;
+  min-width: 0;
+  grid-auto-columns: 260px;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  padding: 0 24px 132px;
+  scroll-padding-inline: 24px;
+  scrollbar-width: none;
+}
+
+.board::-webkit-scrollbar {
+  display: none;
+}
+
+.board-scroll {
+  position: fixed;
+  right: 24px;
+  bottom: calc(86px + var(--safe-bottom));
+  left: 24px;
+  z-index: 8;
+  height: 30px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04), 0 10px 24px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.board-scroll[hidden] {
+  display: none;
+}
+
+.board-scroll-inner {
+  height: 1px;
+}
+
+.board-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+
+.board-scroll::-webkit-scrollbar-track {
+  margin: 7px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.board-scroll::-webkit-scrollbar-thumb {
+  border: 4px solid rgba(255, 255, 255, 0.74);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.column {
+  min-width: 0;
+  border-color: rgba(255, 255, 255, 0.56);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.column.is-inbox-column {
+  background: linear-gradient(180deg, rgba(255, 249, 241, 0.82), rgba(255, 255, 255, 0.64));
+  border-color: rgba(249, 115, 22, 0.2);
+}
+
+.column.is-inbox-column .column-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.column.is-inbox-column .column-color-handle {
+  display: none;
+}
+
+.column.is-inbox-column .column-title {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 2px 10px;
+  align-items: center;
+}
+
+.inbox-icon {
+  grid-row: 1 / span 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, transparent 42%, rgba(255, 255, 255, 0.92) 42% 58%, transparent 58%),
+    linear-gradient(135deg, #fb923c, #f97316);
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.2);
+}
+
+.column.is-inbox-column .column-name-button {
+  font-size: 15px;
+}
+
+.inbox-subtitle {
+  color: color-mix(in srgb, var(--muted) 82%, var(--ink));
+  font-size: 11px;
+  font-weight: 480;
+  line-height: 1.2;
+}
+
+.add-column-tile {
+  width: 260px;
+  min-width: 260px;
+  background: rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@media (max-width: 760px), (pointer: coarse) and (max-width: 940px) {
+  body.is-authenticated {
+    overflow: hidden;
+  }
+
+  .topbar {
+    margin: 10px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.52);
+  }
+
+  .board-meta {
+    width: calc(100vw - 28px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 2px 14px 16px;
+    border-radius: 12px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .board-meta::before {
+    display: none;
+  }
+
+  .board-meta div {
+    border: 1px solid rgba(255, 255, 255, 0.58);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.68);
+    padding: 14px;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.09);
+  }
+
+  .board-meta div::before {
+    display: none;
+  }
+
+  .board {
+    grid-auto-columns: minmax(300px, calc(100vw - 32px));
+    padding: 0 14px 112px;
+    scroll-padding-inline: 14px;
+    scrollbar-width: none;
+  }
+
+  .board-scroll {
+    display: none;
+  }
+
+  .add-column-tile {
+    width: auto;
+    min-width: 0;
+  }
+}
+
