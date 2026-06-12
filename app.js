@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260612-inbox-scroll-glass-1";
+const APP_BUILD_ID = "20260612-mobile-stats-inbox-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -189,6 +189,9 @@ const boardScrollInner = document.querySelector("#boardScrollInner");
 const totalCardsEl = document.querySelector("#totalCards");
 const doneCardsEl = document.querySelector("#doneCards");
 const focusCardsEl = document.querySelector("#focusCards");
+const boardProgressLabelEl = document.querySelector("#boardProgressLabel");
+const boardProgressCountEl = document.querySelector("#boardProgressCount");
+const boardProgressBarEl = document.querySelector("#boardProgressBar");
 const scrimEl = document.querySelector("#scrim");
 
 const cardSheet = document.querySelector("#cardSheet");
@@ -476,6 +479,7 @@ document.querySelector("#clearVoiceTextButton").addEventListener("click", clearV
 document.querySelector("#resetThemeButton").addEventListener("click", resetTheme);
 backgroundFileInput.addEventListener("change", uploadBackground);
 window.addEventListener("focus", syncRemoteWorkspace);
+window.addEventListener("pageshow", syncRemoteWorkspace);
 window.visualViewport?.addEventListener("resize", updateVisualViewportHeight);
 window.visualViewport?.addEventListener("scroll", updateVisualViewportHeight);
 document.addEventListener("visibilitychange", () => {
@@ -1303,6 +1307,11 @@ function getSafeStatusId(status, focus) {
 function isDoneColumn(column) {
   const title = String(column?.title || "").toLowerCase();
   return title.includes("готов") || title.includes("сделано");
+}
+
+function isTodayColumn(column) {
+  const title = String(column?.title || "").toLowerCase();
+  return column?.id === "today" || title.includes("сегодня");
 }
 
 function getStatusForColumn(card, columnId) {
@@ -2507,11 +2516,24 @@ function renderLabelOptions() {
 
 function renderStats() {
   const doneColumn = state.columns.find(isDoneColumn);
+  const todayColumn = state.columns.find(isTodayColumn);
+  const todayCards = todayColumn ? state.cards.filter((card) => card.columnId === todayColumn.id) : [];
+  const todayDoneCards = todayCards.filter((card) => getSafeStatusId(card.status, card.focus) === "done");
+  const todayProgress = todayCards.length ? Math.round((todayDoneCards.length / todayCards.length) * 100) : 0;
   totalCardsEl.textContent = state.cards.length;
   doneCardsEl.textContent = doneColumn
     ? state.cards.filter((card) => card.columnId === doneColumn.id).length
     : 0;
   focusCardsEl.textContent = state.cards.filter((card) => card.focus).length;
+  if (boardProgressLabelEl) {
+    boardProgressLabelEl.textContent = `Сегодня ${todayProgress}%`;
+  }
+  if (boardProgressCountEl) {
+    boardProgressCountEl.textContent = `${todayDoneCards.length} из ${todayCards.length}`;
+  }
+  if (boardProgressBarEl) {
+    boardProgressBarEl.style.setProperty("--progress", `${todayProgress}%`);
+  }
 }
 
 async function initAuth() {
@@ -3124,12 +3146,13 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   if (hasBoardSyncContent(localBoard)) {
     saveRecoveryBackup("before-remote-apply", localBoard);
   }
-  const localHasContent = mergeLocalData && hasBoardSyncContent(localBoard);
+  const localHasSyncContent = hasBoardSyncContent(localBoard);
+  const localHasContent = mergeLocalData && localHasSyncContent;
   const remoteHasContent = remoteBoard && hasBoardSyncContent(remoteBoard);
   const shouldMerge = Boolean(
     localHasContent && remoteHasContent && remoteBoard && !areBoardsEqual(localBoard, remoteBoard),
   );
-  const shouldSeedRemote = Boolean(localHasContent && remoteBoard && !remoteHasContent);
+  const shouldSeedRemote = Boolean(localHasSyncContent && remoteBoard && !remoteHasContent);
   if (remoteBoard) {
     state = shouldMerge ? mergeBoards(localBoard, remoteBoard) : shouldSeedRemote ? localBoard : remoteBoard;
     quickColumnId = state.columns[0]?.id || "";

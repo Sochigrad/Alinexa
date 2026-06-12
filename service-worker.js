@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260612-inbox-scroll-glass-1";
+self.__ALINEXA_SW_VERSION__ = "20260612-mobile-stats-inbox-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
