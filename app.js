@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260609-mobile-cloud-session-1";
+const APP_BUILD_ID = "20260612-board-redesign-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -1066,18 +1066,20 @@ function renderBoardContent() {
     const header = document.createElement("div");
     header.className = "column-header";
     header.innerHTML = `
+      <button class="column-color-handle" type="button" aria-label="Переместить колонку ${escapeHtml(safeColumn.title)}"></button>
       <div class="column-title">
-        <button class="column-color-handle" type="button" aria-label="Переместить колонку ${escapeHtml(safeColumn.title)}"></button>
         <button class="column-name-button" type="button" aria-label="Переименовать ${escapeHtml(safeColumn.title)}">
           ${escapeHtml(safeColumn.title)}
         </button>
       </div>
       <div class="column-actions">
+        <span class="column-count" aria-label="Карточек в колонке">${cards.length}</span>
+        <button class="icon-btn column-add-btn" type="button" aria-label="Добавить карточку в ${escapeHtml(safeColumn.title)}">+</button>
         <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку ${escapeHtml(safeColumn.title)}">✎</button>
       </div>
     `;
     header.addEventListener("pointerdown", (event) => {
-      if (event.target.closest(".column-edit-btn")) {
+      if (event.target.closest(".column-add-btn, .column-edit-btn")) {
         return;
       }
       startColumnDrag(event, safeColumn.id);
@@ -1109,19 +1111,11 @@ function renderBoardContent() {
     }
     section.appendChild(list);
 
-    const addCardButton = document.createElement("button");
-    addCardButton.className = "column-add-card";
-    addCardButton.type = "button";
-    addCardButton.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить карточку</strong>';
-    addCardButton.addEventListener("click", () => openCardSheet(null, safeColumn.id));
-    section.appendChild(addCardButton);
-
-    const colorHandle = header.querySelector(".column-color-handle");
-    colorHandle?.addEventListener("pointerdown", (event) => startColumnDrag(event, safeColumn.id));
     header.querySelector(".column-name-button")?.addEventListener("click", () => {
       if (Date.now() < suppressClickUntil) return;
       openColumnSheet(safeColumn.id);
     });
+    header.querySelector(".column-add-btn")?.addEventListener("click", () => openCardSheet(null, safeColumn.id));
     header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(safeColumn.id));
 
     boardEl.appendChild(section);
@@ -1130,7 +1124,7 @@ function renderBoardContent() {
   const addColumnTile = document.createElement("button");
   addColumnTile.className = "add-column-tile";
   addColumnTile.type = "button";
-  addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Новая колонка</strong>';
+  addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить новую колонку</strong>';
   addColumnTile.addEventListener("click", () => openColumnSheet());
   boardEl.appendChild(addColumnTile);
 
@@ -1160,17 +1154,22 @@ function renderBoardFallback() {
 
     const header = document.createElement("div");
     header.className = "column-header";
+    const columnCards = cards
+      .filter((card) => String(card?.columnId || "") === columnId)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     header.innerHTML = `
+      <button class="column-color-handle" type="button" aria-label="Переместить колонку ${escapeHtml(title)}"></button>
       <div class="column-title">
-        <button class="column-color-handle" type="button" aria-label="${escapeHtml(title)}"></button>
         <button class="column-name-button" type="button">${escapeHtml(title)}</button>
       </div>
       <div class="column-actions">
+        <span class="column-count" aria-label="Карточек в колонке">${columnCards.length}</span>
+        <button class="icon-btn column-add-btn" type="button" aria-label="Добавить карточку в ${escapeHtml(title)}">+</button>
         <button class="icon-btn column-edit-btn" type="button" aria-label="Редактировать колонку">✎</button>
       </div>
     `;
     header.addEventListener("pointerdown", (event) => {
-      if (event.target.closest(".column-edit-btn")) {
+      if (event.target.closest(".column-add-btn, .column-edit-btn")) {
         return;
       }
       startColumnDrag(event, columnId);
@@ -1183,12 +1182,9 @@ function renderBoardFallback() {
     list.addEventListener("dragover", onDragOver);
     list.addEventListener("drop", onDrop);
 
-    cards
-      .filter((card) => String(card?.columnId || "") === columnId)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-      .forEach((card) => {
-        list.appendChild(createCardElement({ ...card, columnId }));
-      });
+    columnCards.forEach((card) => {
+      list.appendChild(createCardElement({ ...card, columnId }));
+    });
 
     if (!list.children.length) {
       const empty = document.createElement("div");
@@ -1201,21 +1197,16 @@ function renderBoardFallback() {
       if (Date.now() < suppressClickUntil) return;
       openColumnSheet(columnId);
     });
+    header.querySelector(".column-add-btn")?.addEventListener("click", () => openCardSheet(null, columnId));
     header.querySelector(".column-edit-btn")?.addEventListener("click", () => openColumnSheet(columnId));
     section.appendChild(list);
-    const addCardButton = document.createElement("button");
-    addCardButton.className = "column-add-card";
-    addCardButton.type = "button";
-    addCardButton.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить карточку</strong>';
-    addCardButton.addEventListener("click", () => openCardSheet(null, columnId));
-    section.appendChild(addCardButton);
     boardEl.appendChild(section);
   });
 
   const addColumnTile = document.createElement("button");
   addColumnTile.className = "add-column-tile";
   addColumnTile.type = "button";
-  addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Новая колонка</strong>';
+  addColumnTile.innerHTML = '<span aria-hidden="true">+</span><strong>Добавить новую колонку</strong>';
   addColumnTile.addEventListener("click", () => openColumnSheet());
   boardEl.appendChild(addColumnTile);
 }
