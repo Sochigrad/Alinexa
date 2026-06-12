@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260612-board-redesign-1";
+self.__ALINEXA_SW_VERSION__ = "20260612-compact-board-scroll-1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
