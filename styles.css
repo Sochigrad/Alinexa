@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260612-board-redesign-1"),
+    url("assets/welcome-background.png?v=20260612-compact-board-scroll-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -2610,5 +2610,88 @@ body.is-authenticated .app-shell {
 
   .brand p {
     font-size: 12px;
+  }
+}
+
+/* User-requested cleanup: no top tabs, slimmer stats, easier horizontal board scroll. */
+body.is-authenticated {
+  overflow-x: auto;
+}
+
+body.is-authenticated .app-shell {
+  overflow-x: visible;
+}
+
+.topbar {
+  grid-template-columns: minmax(220px, auto) minmax(0, 1fr);
+}
+
+.top-tabs {
+  display: none !important;
+}
+
+.top-actions {
+  justify-self: end;
+}
+
+.board-meta {
+  grid-template-columns: repeat(3, minmax(180px, 360px));
+  justify-content: start;
+  gap: 12px;
+  padding: 36px 28px 22px;
+}
+
+.board-meta div {
+  padding: 17px 20px;
+}
+
+.board {
+  overflow-x: scroll;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+  scroll-snap-type: x proximity;
+}
+
+@media (min-width: 760px) {
+  body.is-authenticated {
+    overflow-x: auto;
+  }
+
+  body.is-authenticated .app-shell {
+    overflow-x: visible;
+  }
+
+  .topbar {
+    grid-template-columns: minmax(220px, auto) minmax(0, 1fr);
+  }
+
+  .board-meta {
+    grid-template-columns: repeat(3, minmax(180px, 360px));
+    padding: 36px 28px 22px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 940px), (max-width: 759px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand actions";
+  }
+
+  .top-tabs {
+    display: none !important;
+  }
+
+  .board-meta {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 18px 14px 16px;
+  }
+
+  .column {
+    height: calc(100svh - 234px);
+    max-height: calc(100svh - 234px);
+  }
+
+  .add-column-tile {
+    min-height: calc(100svh - 234px);
   }
 }
