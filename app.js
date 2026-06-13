@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260613-desktop-header-fix-3";
+const APP_BUILD_ID = "20260613-mobile-auth-icon-4";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -3554,9 +3554,12 @@ async function signInWithEmail(event) {
     return;
   }
 
-  const authReady = await ensureAuthReady({ quiet: true });
+  const preferDirectAuth = isMobileSheetViewport();
+  const authReady = preferDirectAuth ? Boolean(supabaseClient) : await ensureAuthReady({ quiet: true });
   setAuthBusy(true);
-  const { data, error } = authReady
+  const { data, error } = preferDirectAuth
+    ? await signInWithPasswordDirect(email, password)
+    : authReady
     ? await signInWithPasswordResilient(email, password)
     : await signInWithPasswordDirect(email, password);
   setAuthBusy(false);
@@ -3581,7 +3584,7 @@ async function signInWithEmail(event) {
 async function signInWithPasswordResilient(email, password) {
   const primaryResult = await withTimeout(
     supabaseClient.auth.signInWithPassword({ email, password }).catch((error) => ({ error })),
-    7000,
+    14000,
     { timedOut: true },
   );
   if (!primaryResult?.timedOut) {
@@ -3597,14 +3600,17 @@ async function signInWithPasswordDirect(email, password) {
     const response = await withTimeout(
       fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: "POST",
+        cache: "no-store",
+        credentials: "omit",
         headers: {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           "Content-Type": "application/json",
+          "X-Client-Info": "alinexa-mobile-web",
         },
         body: JSON.stringify({ email, password }),
       }),
-      8000,
+      25000,
       null,
     );
     if (!response) {
@@ -3638,7 +3644,7 @@ async function signInWithPasswordDirect(email, password) {
             refresh_token: session.refresh_token,
           })
           .catch(() => null),
-        1800,
+        3500,
         null,
       );
     }

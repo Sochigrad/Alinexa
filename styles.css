@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260613-desktop-header-fix-3"),
+    url("assets/welcome-background.png?v=20260613-mobile-auth-icon-4"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -3342,18 +3342,18 @@ body.is-authenticated .app-shell {
   }
 
   .board-meta-intro::before {
-    content: "⌁";
-    display: grid;
+    display: none;
+    content: none;
+  }
+
+  .board-meta-icon {
+    display: block;
     grid-row: 1 / span 2;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    margin: 0;
-    border-radius: 10px;
-    background: rgba(99, 102, 241, 0.1);
-    color: #6366f1;
-    font-size: 18px;
-    font-weight: 850;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 14px rgba(15, 23, 42, 0.1));
   }
 
   .board-meta-intro strong {

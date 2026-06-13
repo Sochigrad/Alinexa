@@ -1,0 +1,22 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="10" width="108" height="108" rx="28" fill="white"/>
+  <rect x="10" y="10" width="108" height="108" rx="28" fill="url(#cardGlow)" fill-opacity="0.72"/>
+  <rect x="10.5" y="10.5" width="107" height="107" rx="27.5" stroke="white" stroke-opacity="0.78"/>
+  <g filter="url(#shadow)">
+    <path d="M36 78.5L56 56.5L73 73.5L96 45.5" stroke="url(#arrow)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M78 45.5H96V63.5" stroke="url(#arrow)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <defs>
+    <linearGradient id="cardGlow" x1="22" y1="18" x2="112" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white"/>
+      <stop offset="1" stop-color="#F7F9FF"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="34" y1="80" x2="99" y2="43" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3267FF"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <filter id="shadow" x="20" y="30" width="92" height="66" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#5B6DFF" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+</svg>

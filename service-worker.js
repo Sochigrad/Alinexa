@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260613-desktop-header-fix-3";
+self.__ALINEXA_SW_VERSION__ = "20260613-mobile-auth-icon-4";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
