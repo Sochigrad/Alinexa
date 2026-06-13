@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260613-mobile-auth-icon-4"),
+    url("assets/welcome-background.png?v=20260613-icon-layout-fix-5"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -3332,7 +3332,9 @@ body.is-authenticated .app-shell {
   .board-meta-intro {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr);
-    gap: 4px;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 4px 12px;
     min-height: 38px;
     align-content: center;
     padding: 0 20px 0 0;
@@ -3341,13 +3343,14 @@ body.is-authenticated .app-shell {
     box-shadow: none;
   }
 
-  .board-meta-intro::before {
-    display: none;
+  .board-meta .board-meta-intro::before {
+    display: none !important;
     content: none;
   }
 
-  .board-meta-icon {
+  .board-meta .board-meta-icon {
     display: block;
+    grid-column: 1;
     grid-row: 1 / span 2;
     width: 38px;
     height: 38px;
@@ -3358,6 +3361,8 @@ body.is-authenticated .app-shell {
 
   .board-meta-intro strong {
     display: block;
+    grid-column: 2;
+    grid-row: 1;
     color: #101827;
     font-size: 17px;
     font-weight: 850;
@@ -3366,6 +3371,8 @@ body.is-authenticated .app-shell {
 
   .board-meta-intro span {
     display: block;
+    grid-column: 2;
+    grid-row: 2;
     margin-top: 2px;
     color: color-mix(in srgb, var(--muted) 86%, var(--ink));
     font-size: 12px;
