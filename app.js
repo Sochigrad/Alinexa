@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260614-workspace-diagnostics-9";
+const APP_BUILD_ID = "20260614-cloud-migration-10";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -730,7 +730,6 @@ function mergeBoards(localBoard, remoteBoard) {
     }
   });
   const archivedIds = new Set(archiveMap.keys());
-  const deletedIds = new Set(Object.keys(deletedCards));
   const deletedColumnIds = new Set(Object.keys(deletedColumns));
   const columnMap = new Map();
   [...normalizedRemote.columns, ...normalizedLocal.columns].forEach((column) => {
@@ -742,13 +741,21 @@ function mergeBoards(localBoard, remoteBoard) {
 
   const cardMap = new Map();
   [...normalizedRemote.cards, ...normalizedLocal.cards].forEach((card) => {
-    if (!card?.id || deletedIds.has(card.id) || deletedColumnIds.has(card.columnId) || archivedIds.has(card.id)) {
+    if (!card?.id || deletedColumnIds.has(card.columnId) || archivedIds.has(card.id)) {
+      return;
+    }
+    const deletedAt = Number(deletedCards[card.id] || 0);
+    if (deletedAt && deletedAt >= getCardVersion(card)) {
       return;
     }
     const previousCard = cardMap.get(card.id);
     if (!previousCard || getCardVersion(card) >= getCardVersion(previousCard)) {
       cardMap.set(card.id, { ...card });
     }
+  });
+
+  [...cardMap.keys()].forEach((cardId) => {
+    delete deletedCards[cardId];
   });
 
   const columnIds = new Set(columnMap.keys());
@@ -4337,14 +4344,29 @@ async function forceSaveWorkspaceToCloud(event) {
 
   saveRecoveryBackup("before-force-cloud-save", localBoard);
   lastRemoteWorkspaceError = null;
-  hasUnsavedLocalChanges = true;
-  await saveRemoteWorkspace();
+  const payload = {
+    user_id: currentUser.id,
+    board: localBoard,
+    theme: await getRemoteSafeTheme(),
+    labels,
+    updated_at: new Date().toISOString(),
+  };
+  const saveResult = await upsertRemoteWorkspace(payload);
+  if (!saveResult.error) {
+    remoteWorkspaceUpdatedAt = saveResult.data?.updated_at || payload.updated_at;
+    localWorkspaceUpdatedAt = Date.parse(remoteWorkspaceUpdatedAt) || Date.now();
+    localStorage.setItem(LOCAL_UPDATED_KEY, String(localWorkspaceUpdatedAt));
+    hasUnsavedLocalChanges = false;
+  }
   const { data, error } = await fetchRemoteWorkspace("board,updated_at");
   const remoteBoard = data?.board?.columns && data?.board?.cards ? normalizeBoard(data.board) : null;
   const lines = [
     "Принудительная отправка в облако",
-    `Result: ${error || lastRemoteWorkspaceError ? "error" : "ok"}`,
-    `Error: ${error?.message || lastRemoteWorkspaceError?.message || "none"}`,
+    `User: ${currentUser.id}`,
+    `Email: ${currentUser.email || "none"}`,
+    `Result: ${saveResult.error || error ? "error" : "ok"}`,
+    `Save error: ${saveResult.error?.message || "none"}`,
+    `Read error: ${error?.message || "none"}`,
     `Remote updated_at: ${data?.updated_at || "none"}`,
     "",
     formatBoardSummary("Sent local board", localBoard),

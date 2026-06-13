@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260614-workspace-diagnostics-9";
+self.__ALINEXA_SW_VERSION__ = "20260614-cloud-migration-10";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
