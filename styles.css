@@ -45,7 +45,7 @@ body {
 body:not(.is-authenticated) {
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.38), rgba(248, 250, 252, 0.18)),
-    url("assets/welcome-background.png?v=20260612-mobile-stats-inbox-1"),
+    url("assets/welcome-background.png?v=20260613-desktop-sync-polish-1"),
     linear-gradient(145deg, #f8fafc, #e7edf5);
   background-attachment: fixed;
   background-position: center;
@@ -3171,6 +3171,81 @@ body.is-authenticated .app-shell {
 
   .column.is-inbox-column .column-name-button {
     font-size: 16px;
+  }
+}
+
+/* 20260613 desktop polish only */
+@media (min-width: 941px) and (pointer: fine) {
+  .topbar {
+    max-width: calc(100vw - 28px);
+    margin: 14px auto 0;
+    padding: 14px 30px;
+    border-radius: 0 0 12px 12px;
+    background: rgba(255, 255, 255, 0.66);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+  }
+
+  .board-meta {
+    width: min(1120px, calc(100vw - 360px));
+    min-width: 820px;
+    min-height: 82px;
+    margin: 26px auto 28px;
+    grid-template-columns: minmax(300px, 1.35fr) repeat(3, minmax(130px, 0.6fr));
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(255, 255, 255, 0.74);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
+    padding: 18px 28px;
+  }
+
+  .board-meta::before {
+    min-height: 46px;
+    padding: 0 28px 0 0;
+    color: #101827;
+    font-size: 16px;
+    font-weight: 780;
+    line-height: 1.35;
+  }
+
+  .board-meta .board-stat-card {
+    min-height: 46px;
+    grid-template-columns: 44px minmax(0, 1fr);
+    column-gap: 14px;
+    padding: 2px 22px;
+    border-left-color: rgba(15, 23, 42, 0.08);
+  }
+
+  .board-meta .board-stat-card::before {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 22px rgba(37, 99, 235, 0.17);
+  }
+
+  .board-meta .board-stat-card strong {
+    font-size: 22px;
+    font-weight: 820;
+    letter-spacing: 0;
+  }
+
+  .board-meta .board-stat-card span {
+    color: color-mix(in srgb, var(--muted) 88%, var(--ink));
+    font-size: 12px;
+    font-weight: 520;
+  }
+
+  .board-progress {
+    display: none;
+  }
+
+  .column.is-done-column {
+    background: linear-gradient(180deg, rgba(238, 252, 244, 0.8), rgba(255, 255, 255, 0.66));
+    border-color: rgba(34, 197, 94, 0.24);
+    box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.04), 0 18px 38px rgba(15, 23, 42, 0.09);
+  }
+
+  .column.is-done-column .column-color-handle {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.08);
   }
 }
 

@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260612-mobile-stats-inbox-1";
+const APP_BUILD_ID = "20260613-desktop-sync-polish-1";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -37,11 +37,13 @@ const COLUMN_COLORS = [
 ];
 const COLUMN_COLOR_BY_ID = {
   inbox: "#f97316",
+  today: "#ef4444",
+  team: "#8b5cf6",
+  mine: "#f59e0b",
+  done: "#22c55e",
   backlog: "#2563eb",
   doing: "#f97316",
   review: "#8b5cf6",
-  done: "#22c55e",
-  today: "#ef4444",
 };
 
 const defaultTheme = {
@@ -112,10 +114,10 @@ const defaultLabels = [
 const defaultBoard = {
   columns: [
     { id: "inbox", title: "Входящие" },
-    { id: "backlog", title: "Бэклог" },
-    { id: "doing", title: "В работе" },
-    { id: "review", title: "Проверка" },
-    { id: "done", title: "Готово" },
+    { id: "today", title: "Сегодня" },
+    { id: "team", title: "На стороне команды" },
+    { id: "mine", title: "На моей стороне" },
+    { id: "done", title: "Сделано" },
   ],
   cards: [],
   deletedColumns: {},
@@ -1100,6 +1102,9 @@ function renderBoardContent() {
     if (safeColumn.id === INBOX_COLUMN_ID) {
       section.classList.add("is-inbox-column");
     }
+    if (isDoneColumn(safeColumn)) {
+      section.classList.add("is-done-column");
+    }
     section.dataset.columnId = safeColumn.id;
     section.style.setProperty("--column-color", columnColor);
     section.addEventListener("dragover", onDragOver);
@@ -1321,6 +1326,33 @@ function getStatusForColumn(card, columnId) {
     return "done";
   }
   return status === "done" ? (card?.focus ? "today" : "planned") : status;
+}
+
+function applyDailyProgressMeta(card, sourceColumnId, targetColumnId, changedAt) {
+  const sourceColumn = state.columns.find((item) => item.id === sourceColumnId);
+  const targetColumn = state.columns.find((item) => item.id === targetColumnId);
+  const movedFromToday = isTodayColumn(sourceColumn) || Boolean(card?.plannedForToday);
+  const movedToToday = isTodayColumn(targetColumn);
+  const movedToDone = isDoneColumn(targetColumn);
+
+  const nextCard = { ...card };
+  if (movedToToday) {
+    nextCard.plannedForToday = true;
+    delete nextCard.completedTodayAt;
+    return nextCard;
+  }
+
+  if (movedFromToday && movedToDone) {
+    nextCard.plannedForToday = true;
+    nextCard.completedTodayAt = nextCard.completedTodayAt || changedAt;
+    return nextCard;
+  }
+
+  if (movedFromToday && !movedToDone) {
+    delete nextCard.completedTodayAt;
+  }
+
+  return nextCard;
 }
 
 function getSafeLabelId(labelId) {
@@ -2517,8 +2549,13 @@ function renderLabelOptions() {
 function renderStats() {
   const doneColumn = state.columns.find(isDoneColumn);
   const todayColumn = state.columns.find(isTodayColumn);
-  const todayCards = todayColumn ? state.cards.filter((card) => card.columnId === todayColumn.id) : [];
-  const todayDoneCards = todayCards.filter((card) => getSafeStatusId(card.status, card.focus) === "done");
+  const todayCards = todayColumn
+    ? state.cards.filter((card) => card.columnId === todayColumn.id || card.plannedForToday)
+    : state.cards.filter((card) => card.plannedForToday);
+  const todayDoneCards = todayCards.filter((card) => {
+    const column = state.columns.find((item) => item.id === card.columnId);
+    return getSafeStatusId(card.status, card.focus) === "done" || isDoneColumn(column);
+  });
   const todayProgress = todayCards.length ? Math.round((todayDoneCards.length / todayCards.length) * 100) : 0;
   totalCardsEl.textContent = state.cards.length;
   doneCardsEl.textContent = doneColumn
@@ -5009,7 +5046,12 @@ function moveCardToPosition(cardId, columnId, dropIndex) {
   const otherCards = state.cards.filter((card) => card.id !== cardId);
   const targetCards = otherCards.filter((card) => card.columnId === columnId).sort(sortCards);
   const safeIndex = Math.max(0, Math.min(dropIndex ?? targetCards.length, targetCards.length));
-  const movedCard = { ...movingCard, columnId, status: getStatusForColumn(movingCard, columnId), updatedAt: changedAt };
+  const movedCard = applyDailyProgressMeta(
+    { ...movingCard, columnId, status: getStatusForColumn(movingCard, columnId), updatedAt: changedAt },
+    sourceColumnId,
+    columnId,
+    changedAt,
+  );
   targetCards.splice(safeIndex, 0, movedCard);
 
   const reorderedTargetCards = targetCards.map((card, index) => ({ ...card, order: index, updatedAt: changedAt }));
