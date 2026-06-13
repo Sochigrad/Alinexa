@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260613-auth-diagnostics-6";
+const APP_BUILD_ID = "20260613-mobile-auth-sdk-first-7";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -3559,12 +3559,9 @@ async function signInWithEmail(event) {
     return;
   }
 
-  const preferDirectAuth = isMobileSheetViewport();
-  const authReady = preferDirectAuth ? Boolean(supabaseClient) : await ensureAuthReady({ quiet: true });
+  const authReady = await ensureAuthReady({ quiet: true });
   setAuthBusy(true);
-  const { data, error } = preferDirectAuth
-    ? await signInWithPasswordDirect(email, password)
-    : authReady
+  const { data, error } = authReady
     ? await signInWithPasswordResilient(email, password)
     : await signInWithPasswordDirect(email, password);
   setAuthBusy(false);
