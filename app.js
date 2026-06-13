@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260613-sdk-workspace-sync-8";
+const APP_BUILD_ID = "20260614-workspace-diagnostics-9";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -260,6 +260,8 @@ const authTitle = document.querySelector("#authTitle");
 const authStatus = document.querySelector("#authStatus");
 const authDiagnostics = document.querySelector("#authDiagnostics");
 const authDiagnosticsButton = document.querySelector("#authDiagnosticsButton");
+const workspaceDiagnosticsButton = document.querySelector("#workspaceDiagnosticsButton");
+const forceCloudSaveButton = document.querySelector("#forceCloudSaveButton");
 const authDiagnosticsOutput = document.querySelector("#authDiagnosticsOutput");
 const authEmailLabel = document.querySelector("#authEmailLabel");
 const authEmailInput = document.querySelector("#authEmailInput");
@@ -449,6 +451,8 @@ bindReliableTap(document.querySelector("#resetPasswordButton"), sendPasswordRese
 bindReliableTap(document.querySelector("#signOutButton"), signOut);
 bindReliableTap(document.querySelector("#closeAuthButton"), closeSheets);
 bindReliableTap(authDiagnosticsButton, runAuthDiagnostics);
+bindReliableTap(workspaceDiagnosticsButton, runWorkspaceDiagnostics);
+bindReliableTap(forceCloudSaveButton, forceSaveWorkspaceToCloud);
 avatarInput?.addEventListener("change", saveAvatarFromInput);
 removeAvatarButton?.addEventListener("click", removeAvatar);
 scrimEl.addEventListener("click", closeSheets);
@@ -3564,6 +3568,15 @@ function setAuthMode(mode) {
   authForm.classList.toggle("is-sign-up", isSignUp);
   authForm.classList.toggle("is-password-reset", isPasswordReset);
   authForm.classList.toggle("is-signed-in", isSignedIn);
+  if (authDiagnostics) {
+    authDiagnostics.hidden = !isSignedIn && !authStatus.classList.contains("is-error");
+  }
+  if (forceCloudSaveButton) {
+    forceCloudSaveButton.hidden = !isSignedIn;
+  }
+  if (workspaceDiagnosticsButton) {
+    workspaceDiagnosticsButton.hidden = !isSignedIn;
+  }
   authTitle.textContent = isPasswordReset ? "Новый пароль" : isSignUp ? "Регистрация" : "Личный кабинет";
   authSheet.setAttribute("aria-label", authTitle.textContent);
   authEmailLabel.hidden = isPasswordReset;
@@ -4112,7 +4125,8 @@ function setAuthStatus(message, tone = "") {
   authStatus.classList.toggle("is-success", tone === "success");
   authStatus.classList.toggle("is-error", tone === "error");
   const shouldShowDiagnostics =
-    tone === "error" && (/supabase|связ|подключ|network|fetch|load failed|abort/i.test(message || "") || lastAuthErrorDetails);
+    Boolean(currentUser) ||
+    (tone === "error" && (/supabase|связ|подключ|network|fetch|load failed|abort/i.test(message || "") || lastAuthErrorDetails));
   if (authDiagnostics) {
     authDiagnostics.hidden = !shouldShowDiagnostics;
   }
@@ -4262,6 +4276,97 @@ function runStorageProbe() {
   } catch (error) {
     return `localStorage error: ${error?.message || error}`;
   }
+}
+
+async function runWorkspaceDiagnostics(event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  if (!authDiagnosticsOutput) {
+    return;
+  }
+  authDiagnostics.hidden = false;
+  workspaceDiagnosticsButton.disabled = true;
+  authDiagnosticsOutput.textContent = "Проверяю облачную доску...";
+
+  const token = await getAccessToken();
+  const localBoard = normalizeBoard(state);
+  const { data, error } = await fetchRemoteWorkspace("board,theme,labels,updated_at");
+  const remoteBoard = data?.board?.columns && data?.board?.cards ? normalizeBoard(data.board) : null;
+  const lines = [
+    "Диагностика облачной доски",
+    `Build: ${APP_BUILD_ID}`,
+    `User: ${currentUser?.id || "none"}`,
+    `Email: ${currentUser?.email || "none"}`,
+    `Session token: ${token ? "present" : "missing"}`,
+    `Supabase client: ${supabaseClient?.from ? "SDK+database" : supabaseClient ? "auth only/fallback" : "missing"}`,
+    `Remote updated_at: ${data?.updated_at || "none"}`,
+    `Remote error: ${error ? `${error.name || "Error"} ${error.message}` : "none"}`,
+    "",
+    formatBoardSummary("Local board", localBoard),
+    formatBoardSummary("Remote board", remoteBoard),
+    "",
+    `Unsaved local changes: ${hasUnsavedLocalChanges ? "yes" : "no"}`,
+    `Remote sync marker: ${remoteWorkspaceUpdatedAt || "none"}`,
+    `Local updated marker: ${localWorkspaceUpdatedAt || "none"}`,
+  ];
+  authDiagnosticsOutput.textContent = lines.join("\n");
+  workspaceDiagnosticsButton.disabled = false;
+}
+
+async function forceSaveWorkspaceToCloud(event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  if (!authDiagnosticsOutput) {
+    return;
+  }
+  authDiagnostics.hidden = false;
+  forceCloudSaveButton.disabled = true;
+  authDiagnosticsOutput.textContent = "Отправляю текущую доску в облако...";
+
+  const localBoard = normalizeBoard(state);
+  if (!currentUser) {
+    authDiagnosticsOutput.textContent = "Нужно сначала войти в аккаунт.";
+    forceCloudSaveButton.disabled = false;
+    return;
+  }
+  if (!hasBoardSyncContent(localBoard)) {
+    authDiagnosticsOutput.textContent = `${formatBoardSummary("Local board", localBoard)}\n\nНа этом устройстве нет карточек для отправки в облако. Открой это на ноутбуке, где видны твои карточки.`;
+    forceCloudSaveButton.disabled = false;
+    return;
+  }
+
+  saveRecoveryBackup("before-force-cloud-save", localBoard);
+  lastRemoteWorkspaceError = null;
+  hasUnsavedLocalChanges = true;
+  await saveRemoteWorkspace();
+  const { data, error } = await fetchRemoteWorkspace("board,updated_at");
+  const remoteBoard = data?.board?.columns && data?.board?.cards ? normalizeBoard(data.board) : null;
+  const lines = [
+    "Принудительная отправка в облако",
+    `Result: ${error || lastRemoteWorkspaceError ? "error" : "ok"}`,
+    `Error: ${error?.message || lastRemoteWorkspaceError?.message || "none"}`,
+    `Remote updated_at: ${data?.updated_at || "none"}`,
+    "",
+    formatBoardSummary("Sent local board", localBoard),
+    formatBoardSummary("Remote board after save", remoteBoard),
+  ];
+  authDiagnosticsOutput.textContent = lines.join("\n");
+  forceCloudSaveButton.disabled = false;
+}
+
+function formatBoardSummary(label, board) {
+  if (!board) {
+    return `${label}: none`;
+  }
+  const normalizedBoard = normalizeBoard(board);
+  return [
+    `${label}:`,
+    `  columns: ${normalizedBoard.columns.length}`,
+    `  cards: ${normalizedBoard.cards.length}`,
+    `  archived: ${normalizeArchivedCards(normalizedBoard.archivedCards).length}`,
+    `  deleted cards: ${Object.keys(normalizedBoard.deletedCards || {}).length}`,
+    `  titles: ${normalizedBoard.cards.slice(0, 5).map((card) => card.title).join(" | ") || "none"}`,
+  ].join("\n");
 }
 
 function validateAuthFields(email, password) {

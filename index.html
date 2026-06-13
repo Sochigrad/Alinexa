@@ -358,6 +358,8 @@
         <div class="auth-status" id="authStatus">Войдите или зарегистрируйтесь через e-mail.</div>
         <div class="auth-diagnostics" id="authDiagnostics" hidden>
           <button class="ghost-button" id="authDiagnosticsButton" type="button">Проверить связь с Supabase</button>
+          <button class="ghost-button" id="workspaceDiagnosticsButton" type="button">Проверить облачную доску</button>
+          <button class="primary-button" id="forceCloudSaveButton" type="button">Отправить эту доску в облако</button>
           <pre id="authDiagnosticsOutput" aria-live="polite"></pre>
         </div>
         <div class="avatar-editor" id="avatarEditor" hidden>
@@ -401,7 +403,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260613-sdk-workspace-sync-8";
+      window.ALINEXA_BUILD_ID = "20260614-workspace-diagnostics-9";
       window.alinexaFallbackOpenSheet = (mode, event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
