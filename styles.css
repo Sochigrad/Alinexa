@@ -1591,6 +1591,31 @@ textarea {
   color: var(--danger);
 }
 
+.auth-diagnostics {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-diagnostics[hidden] {
+  display: none;
+}
+
+.auth-diagnostics pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.9);
+  color: #334155;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .avatar-editor {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

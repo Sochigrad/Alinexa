@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260613-icon-layout-fix-5";
+const APP_BUILD_ID = "20260613-auth-diagnostics-6";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -257,6 +257,9 @@ const authSheet = document.querySelector("#authSheet");
 const authForm = document.querySelector("#authForm");
 const authTitle = document.querySelector("#authTitle");
 const authStatus = document.querySelector("#authStatus");
+const authDiagnostics = document.querySelector("#authDiagnostics");
+const authDiagnosticsButton = document.querySelector("#authDiagnosticsButton");
+const authDiagnosticsOutput = document.querySelector("#authDiagnosticsOutput");
 const authEmailLabel = document.querySelector("#authEmailLabel");
 const authEmailInput = document.querySelector("#authEmailInput");
 const authNameGrid = document.querySelector("#authNameGrid");
@@ -282,6 +285,7 @@ const welcomeSignUpButton = document.querySelector("#welcomeSignUpButton");
 const welcomeSignInButton = document.querySelector("#welcomeSignInButton");
 let authMode = "sign-in";
 let ignoreNextAuthToggleClick = false;
+let lastAuthErrorDetails = null;
 
 function bindActionButton(selector, handler) {
   document.querySelector(selector).addEventListener("click", (event) => {
@@ -443,6 +447,7 @@ bindReliableTap(document.querySelector("#signInButton"), handleAuthSubmit);
 bindReliableTap(document.querySelector("#resetPasswordButton"), sendPasswordResetEmail);
 bindReliableTap(document.querySelector("#signOutButton"), signOut);
 bindReliableTap(document.querySelector("#closeAuthButton"), closeSheets);
+bindReliableTap(authDiagnosticsButton, runAuthDiagnostics);
 avatarInput?.addEventListener("change", saveAvatarFromInput);
 removeAvatarButton?.addEventListener("click", removeAvatar);
 scrimEl.addEventListener("click", closeSheets);
@@ -3564,6 +3569,12 @@ async function signInWithEmail(event) {
     : await signInWithPasswordDirect(email, password);
   setAuthBusy(false);
   if (error) {
+    lastAuthErrorDetails = {
+      source: "sign-in",
+      message: error.message || String(error),
+      name: error.name || "",
+      at: new Date().toISOString(),
+    };
     setAuthStatus(`Войти не получилось: ${translateAuthError(error.message)}`, "error");
     return;
   }
@@ -3600,11 +3611,14 @@ async function signInWithPasswordDirect(email, password) {
     const response = await withTimeout(
       fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: "POST",
+        mode: "cors",
         cache: "no-store",
         credentials: "omit",
+        referrerPolicy: "no-referrer",
         headers: {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
           "Content-Type": "application/json",
           "X-Client-Info": "alinexa-mobile-web",
         },
@@ -3650,6 +3664,12 @@ async function signInWithPasswordDirect(email, password) {
     }
     return { data: { session, user: session.user || data.user || null }, error: null };
   } catch (error) {
+    lastAuthErrorDetails = {
+      source: "direct-auth-fetch",
+      message: error?.message || String(error),
+      name: error?.name || "",
+      at: new Date().toISOString(),
+    };
     return { data: null, error };
   }
 }
@@ -4045,6 +4065,157 @@ function setAuthStatus(message, tone = "") {
   authStatus.textContent = message;
   authStatus.classList.toggle("is-success", tone === "success");
   authStatus.classList.toggle("is-error", tone === "error");
+  const shouldShowDiagnostics =
+    tone === "error" && (/supabase|связ|подключ|network|fetch|load failed|abort/i.test(message || "") || lastAuthErrorDetails);
+  if (authDiagnostics) {
+    authDiagnostics.hidden = !shouldShowDiagnostics;
+  }
+  if (!shouldShowDiagnostics && authDiagnosticsOutput) {
+    authDiagnosticsOutput.textContent = "";
+  }
+}
+
+async function runAuthDiagnostics(event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  if (!authDiagnosticsOutput) {
+    return;
+  }
+  authDiagnostics.hidden = false;
+  authDiagnosticsButton.disabled = true;
+  authDiagnosticsOutput.textContent = "Проверяю связь с сайтом и Supabase...";
+
+  const probes = [];
+  probes.push(
+    await runNetworkProbe("Alinexa app.js", () =>
+      fetch(`${APP_URL}app.js?v=${encodeURIComponent(APP_BUILD_ID)}&diag=${Date.now()}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+      }),
+    ),
+  );
+  probes.push(
+    await runNetworkProbe("Supabase settings", () =>
+      fetch(`${SUPABASE_URL}/auth/v1/settings?diag=${Date.now()}`, {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
+          "X-Client-Info": "alinexa-diagnostics",
+        },
+      }),
+    ),
+  );
+  probes.push(
+    await runNetworkProbe("Supabase auth POST", () =>
+      fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password&diag=${Date.now()}`, {
+        method: "POST",
+        mode: "cors",
+        cache: "no-store",
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Client-Info": "alinexa-diagnostics",
+        },
+        body: JSON.stringify({
+          email: `diagnostic-${Date.now()}@alinexa.test`,
+          password: "diagnostic-password",
+        }),
+      }),
+    ),
+  );
+  probes.push(
+    await runNetworkProbe("Supabase workspace REST", () =>
+      fetch(`${SUPABASE_URL}/rest/v1/${WORKSPACE_TABLE}?select=updated_at&limit=1&diag=${Date.now()}`, {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store",
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
+          "X-Client-Info": "alinexa-diagnostics",
+        },
+      }),
+    ),
+  );
+
+  const storageProbe = runStorageProbe();
+  const lines = [
+    "Диагностика Alinexa",
+    `Build: ${APP_BUILD_ID}`,
+    `URL: ${location.href}`,
+    `Online: ${navigator.onLine ? "yes" : "no"}`,
+    `Supabase URL: ${SUPABASE_URL}`,
+    `Supabase key: ${SUPABASE_ANON_KEY ? "present" : "missing"}`,
+    `Client: ${supabaseClient ? "created" : "not created"}`,
+    `Storage: ${storageProbe}`,
+    lastAuthErrorDetails
+      ? `Last auth error: ${lastAuthErrorDetails.name || "Error"} ${lastAuthErrorDetails.message}`
+      : "Last auth error: none",
+    "",
+    ...probes.map(formatNetworkProbe),
+    "",
+    `Browser: ${navigator.userAgent}`,
+  ];
+  authDiagnosticsOutput.textContent = lines.join("\n");
+  authDiagnosticsButton.disabled = false;
+}
+
+async function runNetworkProbe(label, createRequest) {
+  const startedAt = Date.now();
+  try {
+    const response = await withTimeout(createRequest(), 12000, null);
+    const ms = Date.now() - startedAt;
+    if (!response) {
+      return { label, ok: false, ms, detail: "timeout after 12000ms" };
+    }
+    const text = await response.clone().text().catch(() => "");
+    const snippet = text.replace(/\s+/g, " ").slice(0, 140);
+    return {
+      label,
+      ok: true,
+      ms,
+      status: response.status,
+      type: response.type,
+      detail: snippet || response.statusText || "empty response",
+    };
+  } catch (error) {
+    return {
+      label,
+      ok: false,
+      ms: Date.now() - startedAt,
+      detail: `${error?.name || "Error"}: ${error?.message || error}`,
+    };
+  }
+}
+
+function formatNetworkProbe(probe) {
+  const status = probe.ok ? `OK HTTP ${probe.status}` : "FAIL";
+  return `${probe.label}: ${status}, ${probe.ms}ms, ${probe.detail}`;
+}
+
+function runStorageProbe() {
+  try {
+    const key = "alinexa-diagnostic-storage";
+    localStorage.setItem(key, "ok");
+    const value = localStorage.getItem(key);
+    localStorage.removeItem(key);
+    return value === "ok" ? "localStorage ok" : "localStorage blocked";
+  } catch (error) {
+    return `localStorage error: ${error?.message || error}`;
+  }
 }
 
 function validateAuthFields(email, password) {

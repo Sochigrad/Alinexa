@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260613-icon-layout-fix-5";
+self.__ALINEXA_SW_VERSION__ = "20260613-auth-diagnostics-6";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());

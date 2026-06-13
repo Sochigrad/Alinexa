@@ -356,6 +356,10 @@
           <button class="ghost-button" id="closeAuthButton" type="button">Закрыть</button>
         </div>
         <div class="auth-status" id="authStatus">Войдите или зарегистрируйтесь через e-mail.</div>
+        <div class="auth-diagnostics" id="authDiagnostics" hidden>
+          <button class="ghost-button" id="authDiagnosticsButton" type="button">Проверить связь с Supabase</button>
+          <pre id="authDiagnosticsOutput" aria-live="polite"></pre>
+        </div>
         <div class="avatar-editor" id="avatarEditor" hidden>
           <div class="avatar-preview" id="avatarPreview" aria-hidden="true">AM</div>
           <div class="avatar-editor-controls">
@@ -397,7 +401,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
     <script>
-      window.ALINEXA_BUILD_ID = "20260613-icon-layout-fix-5";
+      window.ALINEXA_BUILD_ID = "20260613-auth-diagnostics-6";
       window.alinexaFallbackOpenSheet = (mode, event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
