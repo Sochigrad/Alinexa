@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260613-mobile-auth-sdk-first-7";
+const APP_BUILD_ID = "20260613-sdk-workspace-sync-8";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -178,6 +178,7 @@ let hasUnsavedLocalChanges = false;
 let hasLoadedRemoteWorkspace = false;
 let isWaitingForPasswordRecovery = false;
 let isSigningOut = false;
+let lastRemoteWorkspaceError = null;
 let serviceWorkerReadyPromise = null;
 let reminderAudioContext = null;
 let recognition = null;
@@ -3167,6 +3168,7 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   if (!hasCloudAuthSession()) {
     return;
   }
+  lastRemoteWorkspaceError = null;
 
   let { data, error } = await fetchRemoteWorkspace();
   if (!data && !error) {
@@ -3175,6 +3177,7 @@ async function loadRemoteWorkspace({ mergeLocalData = false } = {}) {
   }
 
   if (error) {
+    lastRemoteWorkspaceError = error;
     setAuthStatus(`Вход выполнен, но доска не загрузилась из облака: ${error.message}`, "error");
     return;
   }
@@ -3309,6 +3312,27 @@ async function fetchRemoteWorkspace(select = "board,theme,labels,updated_at") {
     return { data: null, error: new Error("Нет активной сессии. Войдите в аккаунт еще раз.") };
   }
 
+  if (supabaseClient?.from) {
+    const sdkResult = await withTimeout(
+      supabaseClient
+        .from(WORKSPACE_TABLE)
+        .select(select)
+        .eq("user_id", currentUser.id)
+        .limit(1)
+        .maybeSingle()
+        .then(({ data, error }) => ({ data, error }))
+        .catch((error) => ({ data: null, error })),
+      12000,
+      { timedOut: true },
+    );
+    if (!sdkResult?.timedOut && !sdkResult?.error) {
+      return { data: sdkResult.data || null, error: null };
+    }
+    if (sdkResult?.error && !isNetworkLikeAuthError(sdkResult.error.message || "")) {
+      return { data: null, error: sdkResult.error };
+    }
+  }
+
   const params = new URLSearchParams({
     select,
     user_id: `eq.${currentUser.id}`,
@@ -3337,6 +3361,26 @@ async function upsertRemoteWorkspace(payload) {
   const token = await getAccessToken();
   if (!token || !currentUser) {
     return { data: null, error: new Error("Нет активной сессии. Войдите в аккаунт еще раз.") };
+  }
+
+  if (supabaseClient?.from) {
+    const sdkResult = await withTimeout(
+      supabaseClient
+        .from(WORKSPACE_TABLE)
+        .upsert(payload, { onConflict: "user_id" })
+        .select("updated_at")
+        .maybeSingle()
+        .then(({ data, error }) => ({ data, error }))
+        .catch((error) => ({ data: null, error })),
+      12000,
+      { timedOut: true },
+    );
+    if (!sdkResult?.timedOut && !sdkResult?.error) {
+      return { data: sdkResult.data || null, error: null };
+    }
+    if (sdkResult?.error && !isNetworkLikeAuthError(sdkResult.error.message || "")) {
+      return { data: null, error: sdkResult.error };
+    }
   }
 
   try {
@@ -3420,6 +3464,7 @@ async function saveRemoteWorkspace() {
   isSavingRemoteWorkspace = false;
 
   if (error) {
+    lastRemoteWorkspaceError = error;
     setAuthStatus(`Доска сохранена на этом устройстве, но не ушла в облако: ${error.message}`, "error");
     return;
   }
@@ -3585,8 +3630,12 @@ async function signInWithEmail(event) {
   }
   authPasswordInput.value = "";
   authPasswordRepeatInput.value = "";
-  setAuthStatus("Вход выполнен.", "success");
-  closeSheets();
+  if (lastRemoteWorkspaceError) {
+    setAuthStatus(`Вход выполнен, но облачная доска не загрузилась: ${lastRemoteWorkspaceError.message}`, "error");
+  } else {
+    setAuthStatus("Вход выполнен.", "success");
+    closeSheets();
+  }
 }
 
 async function signInWithPasswordResilient(email, password) {

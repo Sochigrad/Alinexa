@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260613-mobile-auth-sdk-first-7";
+self.__ALINEXA_SW_VERSION__ = "20260613-sdk-workspace-sync-8";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
