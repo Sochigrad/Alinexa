@@ -1,4 +1,4 @@
-self.__ALINEXA_SW_VERSION__ = "20260613-desktop-sync-polish-1";
+self.__ALINEXA_SW_VERSION__ = "20260613-desktop-header-stats-2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());

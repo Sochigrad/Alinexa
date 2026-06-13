@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260613-desktop-sync-polish-1";
+const APP_BUILD_ID = "20260613-desktop-header-stats-2";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -194,6 +194,7 @@ const focusCardsEl = document.querySelector("#focusCards");
 const boardProgressLabelEl = document.querySelector("#boardProgressLabel");
 const boardProgressCountEl = document.querySelector("#boardProgressCount");
 const boardProgressBarEl = document.querySelector("#boardProgressBar");
+const boardProgressEl = document.querySelector("#boardProgress");
 const scrimEl = document.querySelector("#scrim");
 
 const cardSheet = document.querySelector("#cardSheet");
@@ -1120,7 +1121,6 @@ function renderBoardContent() {
         <button class="column-name-button" type="button" aria-label="Переименовать ${escapeHtml(safeColumn.title)}">
           ${escapeHtml(safeColumn.title)}
         </button>
-        ${safeColumn.id === INBOX_COLUMN_ID ? '<span class="inbox-subtitle">быстрые задачи и идеи</span>' : ""}
       </div>
       <div class="column-actions">
         <span class="column-count" aria-label="Карточек в колонке">${cards.length}</span>
@@ -1328,22 +1328,33 @@ function getStatusForColumn(card, columnId) {
   return status === "done" ? (card?.focus ? "today" : "planned") : status;
 }
 
+function getDayKey(value = Date.now()) {
+  const date = new Date(Number(value) || Date.now());
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function applyDailyProgressMeta(card, sourceColumnId, targetColumnId, changedAt) {
   const sourceColumn = state.columns.find((item) => item.id === sourceColumnId);
   const targetColumn = state.columns.find((item) => item.id === targetColumnId);
   const movedFromToday = isTodayColumn(sourceColumn) || Boolean(card?.plannedForToday);
   const movedToToday = isTodayColumn(targetColumn);
   const movedToDone = isDoneColumn(targetColumn);
+  const todayKey = getDayKey(changedAt);
 
   const nextCard = { ...card };
   if (movedToToday) {
     nextCard.plannedForToday = true;
+    nextCard.todayPlanDate = todayKey;
     delete nextCard.completedTodayAt;
     return nextCard;
   }
 
   if (movedFromToday && movedToDone) {
     nextCard.plannedForToday = true;
+    nextCard.todayPlanDate = nextCard.todayPlanDate || todayKey;
     nextCard.completedTodayAt = nextCard.completedTodayAt || changedAt;
     return nextCard;
   }
@@ -2549,9 +2560,12 @@ function renderLabelOptions() {
 function renderStats() {
   const doneColumn = state.columns.find(isDoneColumn);
   const todayColumn = state.columns.find(isTodayColumn);
-  const todayCards = todayColumn
-    ? state.cards.filter((card) => card.columnId === todayColumn.id || card.plannedForToday)
-    : state.cards.filter((card) => card.plannedForToday);
+  const todayKey = getDayKey();
+  const todayCards = state.cards.filter((card) => {
+    const isInTodayColumn = todayColumn && card.columnId === todayColumn.id;
+    const wasPlannedToday = card.todayPlanDate === todayKey || (card.plannedForToday && !card.todayPlanDate);
+    return isInTodayColumn || wasPlannedToday;
+  });
   const todayDoneCards = todayCards.filter((card) => {
     const column = state.columns.find((item) => item.id === card.columnId);
     return getSafeStatusId(card.status, card.focus) === "done" || isDoneColumn(column);
@@ -2564,12 +2578,18 @@ function renderStats() {
   focusCardsEl.textContent = state.cards.filter((card) => card.focus).length;
   if (boardProgressLabelEl) {
     boardProgressLabelEl.textContent = `Сегодня ${todayProgress}%`;
+    boardProgressLabelEl.dataset.desktopLabel = "Продуктивность сегодня";
   }
   if (boardProgressCountEl) {
     boardProgressCountEl.textContent = `${todayDoneCards.length} из ${todayCards.length}`;
+    boardProgressCountEl.dataset.desktopValue = `${todayProgress}%`;
   }
   if (boardProgressBarEl) {
     boardProgressBarEl.style.setProperty("--progress", `${todayProgress}%`);
+  }
+  if (boardProgressEl) {
+    boardProgressEl.dataset.progress = `${todayProgress}%`;
+    boardProgressEl.dataset.label = "Продуктивность сегодня";
   }
 }
 
