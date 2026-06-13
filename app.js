@@ -7,7 +7,7 @@ const PROFILE_KEY = "alinexa-profile-v1";
 const RECOVERY_BACKUPS_KEY = "alinexa-recovery-backups-v1";
 const MAX_RECOVERY_BACKUPS = 12;
 const WORKSPACE_TABLE = "alinexa_workspaces";
-const APP_BUILD_ID = "20260613-desktop-header-stats-2";
+const APP_BUILD_ID = "20260613-desktop-header-fix-3";
 const SUPABASE_URL = "https://uhxenswxuiebpxwksobw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoeGVuc3d4dWllYnB4d2tzb2J3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTM5MjksImV4cCI6MjA5NDU4OTkyOX0.QSc3NN9KF73yhKVjkxFYxFE0j91XOtCUeIpptI1uaCM";
@@ -2563,7 +2563,9 @@ function renderStats() {
   const todayKey = getDayKey();
   const todayCards = state.cards.filter((card) => {
     const isInTodayColumn = todayColumn && card.columnId === todayColumn.id;
-    const wasPlannedToday = card.todayPlanDate === todayKey || (card.plannedForToday && !card.todayPlanDate);
+    const fallbackDayKey = getDayKey(card.createdAt || card.updatedAt || Date.now());
+    const wasPlannedToday =
+      card.todayPlanDate === todayKey || (card.plannedForToday && !card.todayPlanDate && fallbackDayKey === todayKey);
     return isInTodayColumn || wasPlannedToday;
   });
   const todayDoneCards = todayCards.filter((card) => {
@@ -4303,6 +4305,11 @@ async function saveCard(event) {
     updatedAt: changedAt,
   };
   payload.status = getStatusForColumn(payload, payload.columnId);
+  if (isTodayColumn(state.columns.find((column) => column.id === payload.columnId))) {
+    payload.plannedForToday = true;
+    payload.todayPlanDate = getDayKey(changedAt);
+    delete payload.completedTodayAt;
+  }
 
   if (!payload.title) {
     return;
@@ -4312,8 +4319,11 @@ async function saveCard(event) {
     const previousCard = state.cards.find((card) => card.id === activeCardId);
     const movedToNewColumn = previousCard && previousCard.columnId !== payload.columnId;
     const nextOrder = movedToNewColumn ? getNextOrder(payload.columnId) : previousCard?.order;
+    const nextCardPayload = previousCard
+      ? applyDailyProgressMeta({ ...previousCard, ...payload }, previousCard.columnId, payload.columnId, changedAt)
+      : payload;
     state.cards = state.cards.map((card) =>
-      card.id === activeCardId ? { ...card, ...payload, order: nextOrder ?? card.order ?? 0 } : card,
+      card.id === activeCardId ? { ...card, ...nextCardPayload, order: nextOrder ?? card.order ?? 0 } : card,
     );
     state = normalizeBoard(state);
   } else {
